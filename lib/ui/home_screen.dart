@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-// import '../engine/audio_engine.dart';
-// import '../engine/bindings.dart';
+import '../engine/audio_engine.dart';
+import '../engine/bindings.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,12 +14,52 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  //   AudioEngine? _engine;
+  AudioEngine? _engine;
 
   final ValueNotifier<bool> _playing = ValueNotifier(false);
   final ValueNotifier<double> _frequency = ValueNotifier(440.0);
   final ValueNotifier<double> _amplitude = ValueNotifier(0.3);
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initEngine();
+  }
+
+  void _initEngine() {
+    if (!Platform.isAndroid) {
+      setState(() => _error = 'Native audio only on Android');
+      return;
+    }
+
+    final lib = DynamicLibrary.open('libnative_audio.so');
+    final bindings = NativeBindings(lib);
+
+    _engine = AudioEngine(bindings)..init();
+    _engine!.setFrequency(_frequency.value);
+    _engine!.setAmplitude(_amplitude.value);
+  }
+
+  @override
+  void dispose() {
+    _engine?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (_engine == null) return;
+
+    setState(() {
+      if (_playing.value) {
+        _engine!.stop();
+        _playing.value = false;
+      } else {
+        _engine!.start();
+        _playing.value = true;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 divisions: 77,
                 suffix: 'Hz',
                 onChanged: (v) {
-                  //   _engine?.setFrequency(v);
+                  _engine?.setFrequency(v);
                 },
               ),
               const SizedBox(height: 24),
@@ -56,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 max: 1,
                 suffix: '',
                 onChanged: (v) {
-                  //   _engine?.setAmplitude(v);
+                  _engine?.setAmplitude(v);
                 },
               ),
               const SizedBox(height: 32),
@@ -68,8 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
         valueListenable: _playing,
         builder: (context, isPlaying, child) {
           return FloatingActionButton.extended(
-            // onPressed: _togglePlay,
-            onPressed: () {},
+            onPressed: _togglePlay,
             label: Text(isPlaying ? 'Stop' : 'Play'),
             icon: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
             backgroundColor: isPlaying
