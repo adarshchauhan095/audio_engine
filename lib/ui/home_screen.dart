@@ -1,8 +1,20 @@
-/// The main screen of the audio engine application.
-///
-/// This widget displays controls for frequency and amplitude,
-/// an audio status indicator, and a visualizer. It manages the
-/// lifecycle of the [AudioEngine] and its interaction with the UI.
+/*
+ * The main screen of the audio engine application.
+ *
+ * This widget displays controls for frequency and amplitude,
+ * an audio status indicator, and a visualizer. It manages the
+ * lifecycle of the [AudioEngine] and its interaction with the UI.
+ */
+import 'dart:ffi';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+
+import '../engine/audio_engine.dart';
+import '../engine/bindings.dart';
+import 'widgets/amplitude_slider.dart';
+import 'widgets/frequency_slider.dart';
+
 class HomeScreen extends StatefulWidget {
   /// Creates the home screen widget.
   const HomeScreen({super.key});
