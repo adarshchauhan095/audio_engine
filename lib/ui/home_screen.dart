@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
+import 'widgets/amplitude_slider.dart';
+import 'widgets/frequency_slider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -77,24 +79,20 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
               _buildAudioVisualizer(),
               const SizedBox(height: 32),
-              _CustomSlider(
-                label: 'Frequency',
+              FrequencySlider(
                 valueNotifier: _frequency,
                 min: 110,
                 max: 880,
                 divisions: 77,
-                suffix: 'Hz',
                 onChanged: (v) {
                   _engine?.setFrequency(v);
                 },
               ),
               const SizedBox(height: 24),
-              _CustomSlider(
-                label: 'Amplitude',
+              AmplitudeSlider(
                 valueNotifier: _amplitude,
                 min: 0,
                 max: 1,
-                suffix: '',
                 onChanged: (v) {
                   _engine?.setAmplitude(v);
                 },
@@ -215,61 +213,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _CustomSlider extends StatelessWidget {
-  final String label;
-  final ValueNotifier<double> valueNotifier;
-  final double min;
-  final double max;
-  final int? divisions;
-  final String suffix;
-  final ValueChanged<double>? onChanged;
-
-  const _CustomSlider({
-    required this.label,
-    required this.valueNotifier,
-    required this.min,
-    required this.max,
-    this.divisions,
-    this.suffix = '',
-    this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<double>(
-      valueListenable: valueNotifier,
-      builder: (context, value, child) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$label: ${value.toStringAsFixed(value is int ? 0 : 1)}$suffix',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-                showValueIndicator: ShowValueIndicator.onDrag,
-              ),
-              child: Slider(
-                value: value,
-                min: min,
-                max: max,
-                divisions: divisions,
-                label: value.toStringAsFixed(value is int ? 0 : 1),
-                onChanged: (newValue) {
-                  valueNotifier.value = newValue;
-                  onChanged?.call(newValue);
-                },
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }
