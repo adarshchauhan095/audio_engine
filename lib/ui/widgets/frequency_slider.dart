@@ -1,12 +1,28 @@
 import 'package:flutter/material.dart';
 
+/// A customizable slider widget for controlling audio frequency.
+///
+/// This widget provides a visual slider that allows users to adjust
+/// a frequency value within a specified range. It uses a [ValueNotifier]
+/// to reactively update and display the current frequency.
 class FrequencySlider extends StatelessWidget {
+  /// The [ValueNotifier] that holds and notifies listeners of changes
+  /// to the current frequency value.
   final ValueNotifier<double> valueNotifier;
+
+  /// The minimum frequency value selectable on the slider. Defaults to 110 Hz.
   final double min;
+
+  /// The maximum frequency value selectable on the slider. Defaults to 880 Hz.
   final double max;
+
+  /// The number of discrete divisions in the slider. Defaults to 77.
   final int? divisions;
+
+  /// A callback function that is invoked when the slider's value changes.
   final ValueChanged<double>? onChanged;
 
+  /// Creates a [FrequencySlider] widget.
   const FrequencySlider({
     super.key,
     required this.valueNotifier,
@@ -24,6 +40,7 @@ class FrequencySlider extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            /// Displays the current frequency value.
             Text(
               'Frequency: ${value.toStringAsFixed(1)}Hz',
               style: Theme.of(context).textTheme.titleMedium,
@@ -40,6 +57,7 @@ class FrequencySlider extends StatelessWidget {
                 divisions: divisions,
                 label: value.toStringAsFixed(1),
                 onChanged: (newValue) {
+                  // Update the ValueNotifier and call the external onChanged callback.
                   valueNotifier.value = newValue;
                   onChanged?.call(newValue);
                 },

@@ -1,26 +1,34 @@
-import 'dart:ffi';
-import 'dart:io';
-
-import 'package:flutter/material.dart';
-
-import '../engine/audio_engine.dart';
-import '../engine/bindings.dart';
-import 'widgets/amplitude_slider.dart';
-import 'widgets/frequency_slider.dart';
-
+/// The main screen of the audio engine application.
+///
+/// This widget displays controls for frequency and amplitude,
+/// an audio status indicator, and a visualizer. It manages the
+/// lifecycle of the [AudioEngine] and its interaction with the UI.
 class HomeScreen extends StatefulWidget {
+  /// Creates the home screen widget.
   const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// The state for the [HomeScreen] widget.
+///
+/// Manages the audio engine instance, playback state, frequency,
+/// amplitude, and error handling for platform-specific audio setup.
 class _HomeScreenState extends State<HomeScreen> {
+  /// The audio engine instance responsible for native audio playback.
   AudioEngine? _engine;
 
+  /// Notifier for tracking the audio playback state (playing or stopped).
   final ValueNotifier<bool> _playing = ValueNotifier(false);
+
+  /// Notifier for tracking and updating the audio frequency.
   final ValueNotifier<double> _frequency = ValueNotifier(440.0);
+
+  /// Notifier for tracking and updating the audio amplitude.
   final ValueNotifier<double> _amplitude = ValueNotifier(0.3);
+
+  /// Stores any error messages encountered during engine initialization.
   String? _error;
 
   @override
@@ -29,15 +37,24 @@ class _HomeScreenState extends State<HomeScreen> {
     _initEngine();
   }
 
+  /// Initializes the native audio engine.
+  ///
+  /// This method checks if the platform is Android, and if so,
+  /// opens the native library, creates [NativeBindings], and
+  /// initializes the [AudioEngine]. It also sets the initial
+  /// frequency and amplitude. If not on Android, it sets an error message.
   void _initEngine() {
     if (!Platform.isAndroid) {
       setState(() => _error = 'Native audio only on Android');
       return;
     }
 
+    // Open the native audio library.
     final lib = DynamicLibrary.open('libnative_audio.so');
+    // Create bindings to the native functions.
     final bindings = NativeBindings(lib);
 
+    // Initialize the audio engine and set default values.
     _engine = AudioEngine(bindings)..init();
     _engine!.setFrequency(_frequency.value);
     _engine!.setAmplitude(_amplitude.value);
@@ -45,10 +62,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    // Dispose of the audio engine when the widget is removed from the tree.
     _engine?.dispose();
     super.dispose();
   }
 
+  /// Toggles the audio playback state (play/stop).
+  ///
+  /// If the engine is currently playing, it stops playback.
+  /// If not playing, it starts playback.
   void _togglePlay() {
     if (_engine == null) return;
 
@@ -65,9 +87,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // If an error occurred during engine initialization, display an error widget.
     if (_error != null) {
       return _buildErrorWidget(context, _error!);
     }
+    // Otherwise, build the main UI with sliders, indicators, and controls.
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -79,6 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
               _buildAudioVisualizer(),
               const SizedBox(height: 32),
+
+              /// Slider for controlling the audio frequency.
               FrequencySlider(
                 valueNotifier: _frequency,
                 min: 110,
@@ -89,6 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               const SizedBox(height: 24),
+
+              /// Slider for controlling the audio amplitude.
               AmplitudeSlider(
                 valueNotifier: _amplitude,
                 min: 0,
@@ -119,6 +147,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds the widget that indicates the current audio playback status.
+  ///
+  /// Displays text indicating whether the audio is 'Playing' or 'Stopped'.
   Widget _buildAudioStatusIndicator() {
     return ValueListenableBuilder<bool>(
       valueListenable: _playing,
@@ -141,6 +172,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds an animated visualizer for the audio playback.
+  ///
+  /// The visualizer (a pulsing circle with an audio icon) changes size
+  /// and color based on whether the audio is currently playing.
   Widget _buildAudioVisualizer() {
     return ValueListenableBuilder<bool>(
       valueListenable: _playing,
@@ -177,6 +212,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds and returns an error message widget.
+  ///
+  /// This is displayed when an error prevents the audio engine from initializing.
+  ///
+  /// [context] The build context.
+  /// [message] The error message to display.
   Widget _buildErrorWidget(BuildContext context, String message) {
     return Scaffold(
       body: Center(
