@@ -1,9 +1,11 @@
 #pragma once // Ensures this header file is included only once during compilation.
 
 #include <oboe/Oboe.h>    // Oboe library for high-performance audio.
+#include <atomic>
 #include <memory>         // For std::shared_ptr.
 #include <mutex>          // For std::mutex to protect shared resources.
 #include "Oscillator.h"   // Includes the Oscillator class definition.
+#include "ParameterSmoother.h"
 
 /// @class AudioEngine
 /// @brief Manages audio stream creation, playback, and interaction with an oscillator.
@@ -49,5 +51,6 @@ private:
   std::mutex mutex_;                                 ///< Mutex to protect access to shared stream resources.
   std::shared_ptr<oboe::AudioStream> stream_;        ///< Shared pointer to the Oboe audio stream.
   Oscillator osc_;                                   ///< The oscillator instance used to generate audio waveforms.
-  std::atomic<float> amplitude_{0.3f};              ///< Atomic float for thread-safe amplitude control, initialized to 0.3.
+  ParameterSmoother amplitudeSmoother_;              ///< Smooths amplitude changes to avoid zipper noise and clicks.
+  std::atomic<float> amplitudeTarget_{0.3f};         ///< User-set amplitude target preserved across start/stop.
 };

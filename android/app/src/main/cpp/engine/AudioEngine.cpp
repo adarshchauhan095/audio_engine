@@ -1,4 +1,14 @@
 #include "AudioEngine.h" // Includes the declaration of the AudioEngine class.
+#include <algorithm>
+#include <chrono>
+#include <thread>
+
+namespace {
+constexpr float kAmplitudeSmoothingMs = 8.0f;
+constexpr float kStopThreshold = 0.0005f;
+constexpr auto kStopFadePollInterval = std::chrono::milliseconds(1);
+constexpr auto kStopFadeTimeout = std::chrono::milliseconds(80);
+}
 
 /// @brief Starts the Oboe audio stream.
 ///
@@ -27,6 +37,13 @@ bool AudioEngine::start() {
     // (Error logging not shown in this snippet but would typically be here).
     return false;
   }
+
+  const float currentAmplitude = amplitudeTarget_.load(std::memory_order_relaxed);
+  amplitudeSmoother_.setSmoothingTimeMs(
+      kAmplitudeSmoothingMs,
+      static_cast<float>(stream_->getSampleRate()));
+  amplitudeSmoother_.reset(currentAmplitude);
+
   // Request the stream to start.
   return stream_->requestStart() == oboe::Result::OK;
 }
@@ -38,6 +55,14 @@ bool AudioEngine::start() {
 void AudioEngine::stop() {
   std::lock_guard<std::mutex> lock(mutex_); // Acquire a lock.
   if (stream_) { // Check if a stream exists.
+    amplitudeSmoother_.setTarget(0.0f);
+
+    const auto deadline = std::chrono::steady_clock::now() + kStopFadeTimeout;
+    while (amplitudeSmoother_.current() > kStopThreshold &&
+           std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(kStopFadePollInterval);
+    }
+
     stream_->requestStop(); // Request the stream to stop.
     stream_->close();       // Close the stream.
     stream_.reset();        // Reset the shared pointer to null.
@@ -56,7 +81,9 @@ void AudioEngine::setFrequency(float hz) {
 ///
 /// @param amp The desired amplitude value (e.g., 0.0 to 1.0).
 void AudioEngine::setAmplitude(float amp) {
-  amplitude_.store(amp, std::memory_order_relaxed);
+  const float clampedAmp = std::clamp(amp, 0.0f, 1.0f);
+  amplitudeTarget_.store(clampedAmp, std::memory_order_relaxed);
+  amplitudeSmoother_.setTarget(clampedAmp);
 }
 
 /// @brief Oboe audio data callback.
@@ -74,11 +101,10 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
 
   // Cast the void pointer to a float pointer for audio data.
   float* out = static_cast<float*>(audioData);
-  // Atomically load the current amplitude value.
-  float amp = amplitude_.load(std::memory_order_relaxed);
 
   // Generate audio samples for each frame.
   for (int i = 0; i < numFrames; ++i) {
+    const float amp = amplitudeSmoother_.process();
     // Multiply the oscillator's output by the current amplitude and store it in the buffer.
     out[i] = amp * osc_.process();
   }

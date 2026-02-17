@@ -12,6 +12,7 @@ find_package(oboe REQUIRED CONFIG)
 add_library(native_audio SHARED
   ffi/bridge.cpp          # C++ code for bridging Dart FFI calls to native audio logic.
   engine/AudioEngine.cpp  # Implements the core audio engine functionality.
+  engine/ParameterSmoother.cpp # Smooth parameter transitions to prevent clicks.
   engine/Oscillator.cpp   # Implements the audio oscillator for generating tones.
 )
 
