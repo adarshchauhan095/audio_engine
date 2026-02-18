@@ -52,5 +52,8 @@ private:
   std::shared_ptr<oboe::AudioStream> stream_;        ///< Shared pointer to the Oboe audio stream.
   Oscillator osc_;                                   ///< The oscillator instance used to generate audio waveforms.
   ParameterSmoother amplitudeSmoother_;              ///< Smooths amplitude changes to avoid zipper noise and clicks.
+  ParameterSmoother transportSmoother_;              ///< Handles short start/stop gain ramps.
+  std::atomic<bool> stopRequested_{false};           ///< Signals callback to perform sample-accurate stop.
+  std::atomic<bool> stopReady_{false};               ///< Set by callback when stream can be stopped cleanly.
   std::atomic<float> amplitudeTarget_{0.3f};         ///< User-set amplitude target preserved across start/stop.
 };

@@ -1,13 +1,15 @@
 #include "AudioEngine.h" // Includes the declaration of the AudioEngine class.
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <thread>
 
 namespace {
 constexpr float kAmplitudeSmoothingMs = 8.0f;
-constexpr float kStopThreshold = 0.0005f;
+constexpr float kTransportRampMs = 20.0f;
+constexpr float kStopThreshold = 0.00005f;
 constexpr auto kStopFadePollInterval = std::chrono::milliseconds(1);
-constexpr auto kStopFadeTimeout = std::chrono::milliseconds(80);
+constexpr auto kStopFadeTimeout = std::chrono::milliseconds(200);
 }
 
 /// @brief Starts the Oboe audio stream.
@@ -39,10 +41,17 @@ bool AudioEngine::start() {
   }
 
   const float currentAmplitude = amplitudeTarget_.load(std::memory_order_relaxed);
+  stopRequested_.store(false, std::memory_order_relaxed);
+  stopReady_.store(false, std::memory_order_relaxed);
   amplitudeSmoother_.setSmoothingTimeMs(
       kAmplitudeSmoothingMs,
       static_cast<float>(stream_->getSampleRate()));
   amplitudeSmoother_.reset(currentAmplitude);
+  transportSmoother_.setSmoothingTimeMs(
+      kTransportRampMs,
+      static_cast<float>(stream_->getSampleRate()));
+  transportSmoother_.reset(0.0f);
+  transportSmoother_.setTarget(1.0f);
 
   // Request the stream to start.
   return stream_->requestStart() == oboe::Result::OK;
@@ -56,16 +65,22 @@ void AudioEngine::stop() {
   std::lock_guard<std::mutex> lock(mutex_); // Acquire a lock.
   if (stream_) { // Check if a stream exists.
     amplitudeSmoother_.setTarget(0.0f);
+    transportSmoother_.setTarget(0.0f);
+    stopRequested_.store(true, std::memory_order_relaxed);
 
     const auto deadline = std::chrono::steady_clock::now() + kStopFadeTimeout;
-    while (amplitudeSmoother_.current() > kStopThreshold &&
+    while (!stopReady_.load(std::memory_order_relaxed) &&
            std::chrono::steady_clock::now() < deadline) {
       std::this_thread::sleep_for(kStopFadePollInterval);
     }
 
-    stream_->requestStop(); // Request the stream to stop.
+    if (!stopReady_.load(std::memory_order_relaxed)) {
+      stream_->requestStop(); // Fallback stop if callback did not stop in time.
+    }
     stream_->close();       // Close the stream.
     stream_.reset();        // Reset the shared pointer to null.
+    stopRequested_.store(false, std::memory_order_relaxed);
+    stopReady_.store(false, std::memory_order_relaxed);
   }
 }
 
@@ -104,9 +119,23 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
 
   // Generate audio samples for each frame.
   for (int i = 0; i < numFrames; ++i) {
+    const bool stopping = stopRequested_.load(std::memory_order_relaxed);
+    const float transport = transportSmoother_.process();
     const float amp = amplitudeSmoother_.process();
     // Multiply the oscillator's output by the current amplitude and store it in the buffer.
-    out[i] = amp * osc_.process();
+    const float sample = transport * amp * osc_.process();
+
+    if (stopping &&
+        transport <= kStopThreshold &&
+        std::fabs(sample) <= kStopThreshold) {
+      for (int j = i; j < numFrames; ++j) {
+        out[j] = 0.0f;
+      }
+      stopReady_.store(true, std::memory_order_relaxed);
+      return oboe::DataCallbackResult::Stop;
+    }
+
+    out[i] = sample;
   }
   return oboe::DataCallbackResult::Continue; // Indicate that the stream should continue.
 }
