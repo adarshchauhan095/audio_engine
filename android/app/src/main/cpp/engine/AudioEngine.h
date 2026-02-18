@@ -16,11 +16,13 @@
 /// through an internal [Oscillator] instance.
 class AudioEngine : public oboe::AudioStreamDataCallback {
 public:
+  ~AudioEngine();
+
   /// @brief Starts the audio stream.
   /// @return True if the stream starts successfully, false otherwise.
   bool start();
 
-  /// @brief Stops the audio stream.
+  /// @brief Fades output to silence while keeping the stream alive.
   void stop();
 
   /// @brief Sets the frequency of the audio oscillator.
@@ -53,7 +55,5 @@ private:
   Oscillator osc_;                                   ///< The oscillator instance used to generate audio waveforms.
   ParameterSmoother amplitudeSmoother_;              ///< Smooths amplitude changes to avoid zipper noise and clicks.
   ParameterSmoother transportSmoother_;              ///< Handles short start/stop gain ramps.
-  std::atomic<bool> stopRequested_{false};           ///< Signals callback to perform sample-accurate stop.
-  std::atomic<bool> stopReady_{false};               ///< Set by callback when stream can be stopped cleanly.
   std::atomic<float> amplitudeTarget_{0.3f};         ///< User-set amplitude target preserved across start/stop.
 };
