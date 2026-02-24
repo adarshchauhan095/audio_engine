@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 /// A customizable slider widget for controlling audio amplitude.
 ///
-/// This widget provides a visual slider that allows users to adjust
-/// an amplitude value within a specified range. It uses a [ValueNotifier]
-/// to reactively update and display the current amplitude.
+/// Part of the UI bindings; drives [AudioEngine.setAmplitude]. Uses a
+/// [ValueNotifier] to reactively update and display the current amplitude.
 class AmplitudeSlider extends StatelessWidget {
   /// The [ValueNotifier] that holds and notifies listeners of changes
   /// to the current amplitude value.

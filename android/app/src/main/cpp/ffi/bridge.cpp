@@ -31,7 +31,14 @@ int audio_start(NativeAudioHandle h) {
 /// Calls the `stop()` method on the `AudioEngine` instance.
 /// @param h The `NativeAudioHandle` to the `AudioEngine` instance.
 void audio_stop(NativeAudioHandle h) {
-  static_cast<AudioEngine*>(h)->stop(); // Casts the handle to AudioEngine* and calls its stop() method.
+  static_cast<AudioEngine*>(h)->stop();
+}
+
+/// @brief Implements `audio_is_running()` from `bridge.h`.
+/// @param h The `NativeAudioHandle` to the `AudioEngine` instance.
+/// @return 1 if running, 0 otherwise.
+int audio_is_running(NativeAudioHandle h) {
+  return static_cast<AudioEngine*>(h)->isRunning() ? 1 : 0;
 }
 
 /// @brief Implements `audio_set_frequency()` from `bridge.h`.

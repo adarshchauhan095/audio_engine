@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 /// A customizable slider widget for controlling audio frequency.
 ///
-/// This widget provides a visual slider that allows users to adjust
-/// a frequency value within a specified range. It uses a [ValueNotifier]
-/// to reactively update and display the current frequency.
+/// Part of the UI bindings; drives [AudioEngine.setFrequency]. Uses a
+/// [ValueNotifier] to reactively update and display the current frequency.
 class FrequencySlider extends StatelessWidget {
   /// The [ValueNotifier] that holds and notifies listeners of changes
   /// to the current frequency value.

@@ -28,6 +28,7 @@ bool AudioEngine::start() {
     // Keep stream alive and treat start/stop as transport fades to avoid HAL stop/start pops.
     amplitudeSmoother_.setTarget(amplitudeTarget_.load(std::memory_order_relaxed));
     transportSmoother_.setTarget(1.0f);
+    running_.store(true, std::memory_order_relaxed);
     return true;
   }
 
@@ -65,7 +66,12 @@ bool AudioEngine::start() {
     stream_.reset();
     return false;
   }
+  running_.store(true, std::memory_order_relaxed);
   return true;
+}
+
+bool AudioEngine::isRunning() const {
+  return running_.load(std::memory_order_relaxed);
 }
 
 /// @brief Fades audio output to silence without tearing down the stream.
@@ -74,6 +80,7 @@ bool AudioEngine::start() {
 /// route reconfiguration during stop/close.
 void AudioEngine::stop() {
   std::lock_guard<std::mutex> lock(mutex_); // Acquire a lock.
+  running_.store(false, std::memory_order_relaxed);
   if (stream_) { // Check if a stream exists.
     transportSmoother_.setTarget(0.0f);
   }

@@ -2,6 +2,9 @@
 
 #include <cmath>
 
+// Sample-accurate ramp: process() advances one sample toward target.
+// No glitches when UI sends rapid changes; setTarget() is thread-safe.
+
 void ParameterSmoother::setSmoothingTimeMs(float timeMs, float sampleRate) {
   if (timeMs <= 0.0f || sampleRate <= 0.0f) {
     coefficient_ = 0.0f;

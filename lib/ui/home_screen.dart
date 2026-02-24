@@ -1,10 +1,8 @@
-/*
- * The main screen of the audio engine application.
- *
- * This widget displays controls for frequency and amplitude,
- * an audio status indicator, and a visualizer. It manages the
- * lifecycle of the [AudioEngine] and its interaction with the UI.
- */
+/// Main screen and UI bindings for the audio engine.
+///
+/// Connects [FrequencySlider] and [AmplitudeSlider] and play/stop to
+/// [AudioEngine]. All control flows through the engine API; no direct
+/// native or FFI access. Manages engine lifecycle and playback state.
 import 'dart:ffi';
 import 'dart:io';
 
@@ -97,6 +95,92 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Slider range for frequency (must match FrequencySlider min/max to avoid assertion).
+  static const double _freqMin = 110, _freqMax = 880;
+
+  /// Milestone 02: Rapid parameter changes for stability testing.
+  Future<void> _runRapidParams() async {
+    if (_engine == null) return;
+    if (!_playing.value) {
+      _engine!.start();
+      _playing.value = true;
+    }
+    const duration = Duration(milliseconds: 2000);
+    const interval = Duration(milliseconds: 50);
+    final end = DateTime.now().add(duration);
+    while (DateTime.now().isBefore(end)) {
+      final f = 110.0 + (8000 - 110) * (DateTime.now().millisecond % 1000 / 1000);
+      final a = (DateTime.now().millisecond % 1000) / 1000.0;
+      _engine!.setFrequency(f);
+      _engine!.setAmplitude(a);
+      _frequency.value = f.clamp(_freqMin, _freqMax);
+      _amplitude.value = a.clamp(0.0, 1.0);
+      if (mounted) setState(() {});
+      await Future<void>.delayed(interval);
+    }
+  }
+
+  /// Milestone 02: Repeated start/stop cycles for stability testing.
+  Future<void> _runStartStop10() async {
+    if (_engine == null) return;
+    for (int i = 0; i < 10 && mounted; i++) {
+      _engine!.start();
+      _playing.value = true;
+      if (mounted) setState(() {});
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      _engine!.stop();
+      _playing.value = false;
+      if (mounted) setState(() {});
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
+
+  /// Milestone 02: Extreme values for stability testing.
+  void _runExtremeValues() {
+    if (_engine == null) return;
+    _engine!.setFrequency(110);
+    _engine!.setFrequency(8000);
+    _engine!.setAmplitude(0);
+    _engine!.setAmplitude(1);
+    _frequency.value = _freqMax;
+    _amplitude.value = 1;
+    setState(() {});
+  }
+
+  /// Builds the Milestone 02 test panel (rapid params, start/stop x10, extreme values).
+  Widget _buildM2TestSection() {
+    return ExpansionTile(
+      title: const Text('Milestone 02 tests'),
+      subtitle: const Text('Rapid params, start/stop x10, extreme values'),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _engine == null ? null : () => _runRapidParams(),
+                icon: const Icon(Icons.speed),
+                label: const Text('Rapid params'),
+              ),
+              FilledButton.icon(
+                onPressed: _engine == null ? null : () => _runStartStop10(),
+                icon: const Icon(Icons.replay_10),
+                label: const Text('Start/stop x10'),
+              ),
+              FilledButton.icon(
+                onPressed: _engine == null ? null : _runExtremeValues,
+                icon: const Icon(Icons.warning_amber),
+                label: const Text('Extreme values'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // If an error occurred during engine initialization, display an error widget.
@@ -106,39 +190,38 @@ class _HomeScreenState extends State<HomeScreen> {
     // Otherwise, build the main UI with sliders, indicators, and controls.
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              _buildAudioStatusIndicator(),
-              const SizedBox(height: 24),
-              _buildAudioVisualizer(),
-              const SizedBox(height: 32),
-
-              /// Slider for controlling the audio frequency.
-              FrequencySlider(
-                valueNotifier: _frequency,
-                min: 110,
-                max: 880,
-                divisions: 77,
-                onChanged: (v) {
-                  _engine?.setFrequency(v);
-                },
-              ),
-              const SizedBox(height: 24),
-
-              /// Slider for controlling the audio amplitude.
-              AmplitudeSlider(
-                valueNotifier: _amplitude,
-                min: 0,
-                max: 1,
-                onChanged: (v) {
-                  _engine?.setAmplitude(v);
-                },
-              ),
-              const SizedBox(height: 32),
-            ],
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                _buildAudioStatusIndicator(),
+                const SizedBox(height: 24),
+                _buildAudioVisualizer(),
+                const SizedBox(height: 32),
+                FrequencySlider(
+                  valueNotifier: _frequency,
+                  min: 110,
+                  max: 880,
+                  divisions: 77,
+                  onChanged: (v) {
+                    _engine?.setFrequency(v);
+                  },
+                ),
+                const SizedBox(height: 24),
+                AmplitudeSlider(
+                  valueNotifier: _amplitude,
+                  min: 0,
+                  max: 1,
+                  onChanged: (v) {
+                    _engine?.setAmplitude(v);
+                  },
+                ),
+                const SizedBox(height: 32),
+                _buildM2TestSection(),
+              ],
+            ),
           ),
         ),
       ),

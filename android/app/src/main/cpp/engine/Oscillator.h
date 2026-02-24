@@ -1,29 +1,23 @@
-#pragma once // Ensures this header file is included only once during compilation.
+#pragma once
 
-#include <atomic> // For std::atomic to ensure thread-safe access to frequency.
+#include <atomic>
 
-/// @class Oscillator
-/// @brief Generates a sine wave signal.
+/// Frequency Control Module: sine oscillator with real-time frequency changes without clicks.
 ///
-/// This class is responsible for producing an audio waveform (specifically a sine wave)
-/// at a given frequency. It maintains the current phase of the oscillation
-/// and provides a method to generate the next sample in the sequence.
+/// [setFrequency] is thread-safe (atomic target). Frequency is smoothed per-sample
+/// so phase and phase increment evolve continuously—stable under large jumps and
+/// prepared for a future tinnitus frequency detection module (same setFrequency API).
 class Oscillator {
 public:
-  /// @brief Sets the frequency of the oscillator.
-  ///
-  /// Uses an atomic operation to ensure thread-safe updates to the frequency.
-  /// @param hz The desired frequency in Hertz.
+  /// Sets the target frequency in Hz. Smoothed internally; safe to call from any thread.
   void setFrequency(float hz);
 
-  /// @brief Generates and returns the next audio sample from the oscillator.
-  ///
-  /// This method advances the phase of the sine wave and returns the corresponding
-  /// amplitude value.
-  /// @return The next floating-point audio sample.
+  /// Generates the next sample. Uses smoothed frequency for phase increment; phase wraps in [0, 2*PI).
   float process();
 
 private:
-  std::atomic<float> frequency_{440.0f}; ///< Atomic float for thread-safe frequency control, initialized to 440 Hz.
-  float phase_ = 0.0f;                   ///< Current phase of the oscillator in radians, ranges from 0 to 2*PI.
+  std::atomic<float> frequencyTarget_{440.0f};  ///< Thread-safe target frequency (Hz).
+  float frequencyCurrent_ = 440.0f;            ///< Smoothed frequency used in process() (audio thread only).
+  float phase_ = 0.0f;                          ///< Current phase in radians.
+  float smoothingCoeff_ = 0.0f;                 ///< One-pole coefficient for frequency smoothing.
 };

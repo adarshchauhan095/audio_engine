@@ -8,28 +8,30 @@
 #include "ParameterSmoother.h"
 
 /// @class AudioEngine
-/// @brief Manages audio stream creation, playback, and interaction with an oscillator.
+/// @brief Engine core: Oboe stream, start/stop with transport ramp, amplitude and frequency control.
 ///
-/// This class extends `oboe::AudioStreamDataCallback` to receive and process
-/// audio data. It sets up an Oboe audio stream, controls its lifecycle (start/stop),
-/// and allows dynamic adjustment of the audio frequency and amplitude
-/// through an internal [Oscillator] instance.
+/// DSP layer: [Oscillator] and [ParameterSmoother] for amplitude and transport.
+/// Parameter updates are sample-accurate (ramps in onAudioReady) and thread-safe
+/// (atomic targets from UI). Exposes start, stop, setFrequency, setAmplitude, isRunning.
 class AudioEngine : public oboe::AudioStreamDataCallback {
 public:
   ~AudioEngine();
 
-  /// @brief Starts the audio stream.
+  /// @brief Starts the audio stream (with smooth fade-in).
   /// @return True if the stream starts successfully, false otherwise.
   bool start();
 
-  /// @brief Fades output to silence while keeping the stream alive.
+  /// @brief Fades output to silence while keeping the stream alive (no HAL stop pops).
   void stop();
 
-  /// @brief Sets the frequency of the audio oscillator.
+  /// @brief Returns true if transport is active (running), false if stopped or fading out.
+  bool isRunning() const;
+
+  /// @brief Sets the frequency of the audio oscillator (smoothed in Oscillator).
   /// @param hz The desired frequency in Hertz.
   void setFrequency(float hz);
 
-  /// @brief Sets the amplitude (volume) of the audio output.
+  /// @brief Sets the amplitude (volume) of the audio output (ramp-smoothed).
   /// @param amp The desired amplitude, typically between 0.0 (silent) and 1.0 (max volume).
   void setAmplitude(float amp);
 
@@ -56,4 +58,5 @@ private:
   ParameterSmoother amplitudeSmoother_;              ///< Smooths amplitude changes to avoid zipper noise and clicks.
   ParameterSmoother transportSmoother_;              ///< Handles short start/stop gain ramps.
   std::atomic<float> amplitudeTarget_{0.3f};         ///< User-set amplitude target preserved across start/stop.
+  std::atomic<bool> running_{false};                  ///< Engine state: true when transport is active (start called, stop not yet).
 };

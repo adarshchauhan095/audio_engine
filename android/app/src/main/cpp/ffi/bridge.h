@@ -1,7 +1,7 @@
-#pragma once // Ensures this header file is included only once during compilation.
+#pragma once
 
-/// Guards the C-style function declarations to ensure they are compiled correctly
-/// when included in a C++ file. This allows C++ code to call C functions.
+/// C ABI for Dart FFI. Thin wrappers around the native [AudioEngine];
+/// no DSP or parameter logic—all calls delegate to AudioEngine methods.
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -24,12 +24,18 @@ void audio_destroy(NativeAudioHandle handle);
 
 /// @brief Starts audio playback for the specified native audio engine.
 /// @param handle A handle to the native audio engine instance.
-/// @return 1 if audio started successfully, 0 otherwise.
+/// @return 0 if audio started successfully, non-zero otherwise.
 int audio_start(NativeAudioHandle handle);
 
 /// @brief Stops audio playback for the specified native audio engine.
 /// @param handle A handle to the native audio engine instance.
 void audio_stop(NativeAudioHandle handle);
+
+/// @brief Returns whether the engine is currently running (transport active).
+/// @param handle A handle to the native audio engine instance.
+/// @return 1 if running, 0 if stopped or fading out.
+int audio_is_running(NativeAudioHandle handle);
+
 
 /// @brief Sets the frequency of the audio oscillator for the given native audio engine.
 /// @param handle A handle to the native audio engine instance.
