@@ -49,10 +49,33 @@ void audio_set_frequency(NativeAudioHandle h, float hz) {
   static_cast<AudioEngine*>(h)->setFrequency(hz); // Casts and calls setFrequency().
 }
 
+/// @brief Implements `audio_set_target_frequency()` from `bridge.h`.
+/// Calls the high-precision frequency target setter.
+/// @param h The `NativeAudioHandle` to the `AudioEngine` instance.
+/// @param hz The desired target frequency in Hertz.
+void audio_set_target_frequency(NativeAudioHandle h, double hz) {
+  static_cast<AudioEngine*>(h)->setTargetFrequency(hz);
+}
+
 /// @brief Implements `audio_set_amplitude()` from `bridge.h`.
 /// Calls the `setAmplitude()` method on the `AudioEngine` instance.
 /// @param h The `NativeAudioHandle` to the `AudioEngine` instance.
 /// @param a The desired amplitude.
 void audio_set_amplitude(NativeAudioHandle h, float a) {
   static_cast<AudioEngine*>(h)->setAmplitude(a); // Casts and calls setAmplitude().
+}
+
+/// @brief Implements `audio_schedule_sequence()` from `bridge.h`.
+void audio_schedule_sequence(NativeAudioHandle h) {
+  static_cast<AudioEngine*>(h)->scheduleSequence();
+}
+
+/// @brief Implements `audio_start_session()` from `bridge.h`.
+void audio_start_session(NativeAudioHandle h) {
+  static_cast<AudioEngine*>(h)->startSession();
+}
+
+/// @brief Implements `audio_stop_session()` from `bridge.h`.
+void audio_stop_session(NativeAudioHandle h) {
+  static_cast<AudioEngine*>(h)->stopSession();
 }

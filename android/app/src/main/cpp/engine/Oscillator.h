@@ -2,22 +2,25 @@
 
 #include <atomic>
 
-/// Frequency Control Module: sine oscillator with real-time frequency changes without clicks.
+/// Sine oscillator with smooth real-time frequency changes.
 ///
-/// [setFrequency] is thread-safe (atomic target). Frequency is smoothed per-sample
-/// so phase and phase increment evolve continuously—stable under large jumps and
-/// prepared for a future tinnitus frequency detection module (same setFrequency API).
+/// [setFrequency] remains backward-compatible and delegates to a
+/// high-precision target setter.
 class Oscillator {
 public:
-  /// Sets the target frequency in Hz. Smoothed internally; safe to call from any thread.
+  /// Sets the target frequency in Hz.
   void setFrequency(float hz);
 
-  /// Generates the next sample. Uses smoothed frequency for phase increment; phase wraps in [0, 2*PI).
+  /// Sets the target frequency in Hz with double precision.
+  void setTargetFrequency(double hz);
+
+  /// Generates the next audio sample.
   float process();
 
 private:
-  std::atomic<float> frequencyTarget_{440.0f};  ///< Thread-safe target frequency (Hz).
-  float frequencyCurrent_ = 440.0f;            ///< Smoothed frequency used in process() (audio thread only).
-  float phase_ = 0.0f;                          ///< Current phase in radians.
-  float smoothingCoeff_ = 0.0f;                 ///< One-pole coefficient for frequency smoothing.
+  std::atomic<double> frequencyTarget_{440.0};
+  double frequencyCurrent_ = 440.0;
+  double phase_ = 0.0;
+  double smoothingCoeff_ = 0.0;
 };
+

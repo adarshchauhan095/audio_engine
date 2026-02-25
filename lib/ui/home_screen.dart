@@ -1,8 +1,8 @@
-/// Main screen and UI bindings for the audio engine.
-///
-/// Connects [FrequencySlider] and [AmplitudeSlider] and play/stop to
-/// [AudioEngine]. All control flows through the engine API; no direct
-/// native or FFI access. Manages engine lifecycle and playback state.
+// Main screen and UI bindings for the audio engine.
+//
+// Connects FrequencySlider and AmplitudeSlider and play/stop to AudioEngine.
+// All control flows through the engine API; no direct native or FFI access.
+// Manages engine lifecycle and playback state.
 import 'dart:ffi';
 import 'dart:io';
 
@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
+import '../session/session_controller.dart';
 import 'widgets/amplitude_slider.dart';
 import 'widgets/frequency_slider.dart';
 
@@ -28,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   /// The audio engine instance responsible for native audio playback.
   AudioEngine? _engine;
+  SessionController? _sessionController;
 
   /// Notifier for tracking the audio playback state (playing or stopped).
   final ValueNotifier<bool> _playing = ValueNotifier(false);
@@ -68,11 +70,27 @@ class _HomeScreenState extends State<HomeScreen> {
     _engine = AudioEngine(bindings)..init();
     _engine!.setFrequency(_frequency.value);
     _engine!.setAmplitude(_amplitude.value);
+    _sessionController = SessionController(
+      engine: _engine!,
+      onFrequencyChanged: (frequencyHz) {
+        _frequency.value = frequencyHz.clamp(_freqMin, _freqMax);
+        if (mounted) setState(() {});
+      },
+      onAmplitudeChanged: (amplitude) {
+        _amplitude.value = amplitude.clamp(0.0, 1.0);
+        if (mounted) setState(() {});
+      },
+      onPlayingChanged: (playing) {
+        _playing.value = playing;
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   @override
   void dispose() {
     // Dispose of the audio engine when the widget is removed from the tree.
+    _sessionController?.dispose();
     _engine?.dispose();
     super.dispose();
   }
@@ -109,7 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
     const interval = Duration(milliseconds: 50);
     final end = DateTime.now().add(duration);
     while (DateTime.now().isBefore(end)) {
-      final f = 110.0 + (8000 - 110) * (DateTime.now().millisecond % 1000 / 1000);
+      final f =
+          110.0 + (8000 - 110) * (DateTime.now().millisecond % 1000 / 1000);
       final a = (DateTime.now().millisecond % 1000) / 1000.0;
       _engine!.setFrequency(f);
       _engine!.setAmplitude(a);
@@ -147,6 +166,21 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {});
   }
 
+  Future<void> _runSequenceTest() async {
+    if (_sessionController == null) return;
+    await _sessionController!.runSequenceTest();
+  }
+
+  Future<void> _runAdaptiveTest() async {
+    if (_sessionController == null) return;
+    await _sessionController!.runAdaptiveTest();
+  }
+
+  Future<void> _runLongRunStabilityTest() async {
+    if (_sessionController == null) return;
+    await _sessionController!.runLongRunStabilityTest();
+  }
+
   /// Builds the Milestone 02 test panel (rapid params, start/stop x10, extreme values).
   Widget _buildM2TestSection() {
     return ExpansionTile(
@@ -173,6 +207,45 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: _engine == null ? null : _runExtremeValues,
                 icon: const Icon(Icons.warning_amber),
                 label: const Text('Extreme values'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSessionDebugSection() {
+    return ExpansionTile(
+      title: const Text('Session debug'),
+      subtitle: const Text('Sequence, adaptive, and long-run checks'),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _sessionController == null
+                    ? null
+                    : () => _runSequenceTest(),
+                icon: const Icon(Icons.queue_music),
+                label: const Text('Sequence test'),
+              ),
+              FilledButton.icon(
+                onPressed: _sessionController == null
+                    ? null
+                    : () => _runAdaptiveTest(),
+                icon: const Icon(Icons.tune),
+                label: const Text('Adaptive test'),
+              ),
+              FilledButton.icon(
+                onPressed: _sessionController == null
+                    ? null
+                    : () => _runLongRunStabilityTest(),
+                icon: const Icon(Icons.hourglass_bottom),
+                label: const Text('Long run stability test'),
               ),
             ],
           ),
@@ -220,6 +293,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 32),
                 _buildM2TestSection(),
+                const SizedBox(height: 12),
+                _buildSessionDebugSection(),
               ],
             ),
           ),

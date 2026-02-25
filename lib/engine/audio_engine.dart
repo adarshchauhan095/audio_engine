@@ -31,8 +31,21 @@ class AudioEngine {
   /// Sets the oscillator frequency in Hz. Changes are applied with smoothing.
   void setFrequency(double hz) => _bindings.setFrequency(_handle!, hz);
 
+  /// Sets the oscillator target frequency in Hz using high-precision input.
+  void setTargetFrequency(double hz) =>
+      _bindings.setTargetFrequency(_handle!, hz);
+
   /// Sets the amplitude in [0, 1]. Changes are ramp-smoothed to avoid clicks.
   void setAmplitude(double amp) => _bindings.setAmplitude(_handle!, amp);
+
+  /// Loads a sequence payload for future scheduler-driven playback.
+  void scheduleSequence() => _bindings.scheduleSequence(_handle!);
+
+  /// Starts a scheduler session context.
+  void startSession() => _bindings.startSession(_handle!);
+
+  /// Stops the scheduler session context.
+  void stopSession() => _bindings.stopSession(_handle!);
 
   /// Releases the native engine. Do not call other methods after this.
   void dispose() {

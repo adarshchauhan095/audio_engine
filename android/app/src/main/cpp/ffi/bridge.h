@@ -42,10 +42,27 @@ int audio_is_running(NativeAudioHandle handle);
 /// @param frequency The desired frequency in Hertz (float).
 void audio_set_frequency(NativeAudioHandle handle, float frequency);
 
+/// @brief Sets the high-precision target frequency for the oscillator layer.
+/// @param handle A handle to the native audio engine instance.
+/// @param frequency The desired frequency in Hertz (double).
+void audio_set_target_frequency(NativeAudioHandle handle, double frequency);
+
 /// @brief Sets the amplitude (volume) of the audio output for the given native audio engine.
 /// @param handle A handle to the native audio engine instance.
 /// @param amplitude The desired amplitude, typically between 0.0 and 1.0 (float).
 void audio_set_amplitude(NativeAudioHandle handle, float amplitude);
+
+/// @brief Schedules a default sequence payload for future session playback.
+/// @param handle A handle to the native audio engine instance.
+void audio_schedule_sequence(NativeAudioHandle handle);
+
+/// @brief Starts a session context for scheduler-owned events.
+/// @param handle A handle to the native audio engine instance.
+void audio_start_session(NativeAudioHandle handle);
+
+/// @brief Stops the active session context.
+/// @param handle A handle to the native audio engine instance.
+void audio_stop_session(NativeAudioHandle handle);
 
 /// Closes the extern "C" block.
 #ifdef __cplusplus
