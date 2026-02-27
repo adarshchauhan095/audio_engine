@@ -42,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Stores any error messages encountered during engine initialization.
   String? _error;
+  bool _isDebugActionRunning = false;
 
   @override
   void initState() {
@@ -181,8 +182,24 @@ class _HomeScreenState extends State<HomeScreen> {
     await _sessionController!.runLongRunStabilityTest();
   }
 
+  Future<void> _runExclusiveDebugAction(Future<void> Function() action) async {
+    if (_isDebugActionRunning) return;
+    setState(() {
+      _isDebugActionRunning = true;
+    });
+    try {
+      await action();
+    } finally {
+      _isDebugActionRunning = false;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
   /// Builds the Milestone 02 test panel (rapid params, start/stop x10, extreme values).
   Widget _buildM2TestSection() {
+    final bool disabled = _engine == null || _isDebugActionRunning;
     return ExpansionTile(
       title: const Text('Milestone 02 tests'),
       subtitle: const Text('Rapid params, start/stop x10, extreme values'),
@@ -194,17 +211,25 @@ class _HomeScreenState extends State<HomeScreen> {
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: _engine == null ? null : () => _runRapidParams(),
+                onPressed: disabled
+                    ? null
+                    : () => _runExclusiveDebugAction(_runRapidParams),
                 icon: const Icon(Icons.speed),
                 label: const Text('Rapid params'),
               ),
               FilledButton.icon(
-                onPressed: _engine == null ? null : () => _runStartStop10(),
+                onPressed: disabled
+                    ? null
+                    : () => _runExclusiveDebugAction(_runStartStop10),
                 icon: const Icon(Icons.replay_10),
                 label: const Text('Start/stop x10'),
               ),
               FilledButton.icon(
-                onPressed: _engine == null ? null : _runExtremeValues,
+                onPressed: disabled
+                    ? null
+                    : () => _runExclusiveDebugAction(() async {
+                        _runExtremeValues();
+                      }),
                 icon: const Icon(Icons.warning_amber),
                 label: const Text('Extreme values'),
               ),
@@ -216,6 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSessionDebugSection() {
+    final bool disabled = _sessionController == null || _isDebugActionRunning;
     return ExpansionTile(
       title: const Text('Session debug'),
       subtitle: const Text('Sequence, adaptive, and long-run checks'),
@@ -227,23 +253,23 @@ class _HomeScreenState extends State<HomeScreen> {
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: _sessionController == null
+                onPressed: disabled
                     ? null
-                    : () => _runSequenceTest(),
+                    : () => _runExclusiveDebugAction(_runSequenceTest),
                 icon: const Icon(Icons.queue_music),
                 label: const Text('Sequence test'),
               ),
               FilledButton.icon(
-                onPressed: _sessionController == null
+                onPressed: disabled
                     ? null
-                    : () => _runAdaptiveTest(),
+                    : () => _runExclusiveDebugAction(_runAdaptiveTest),
                 icon: const Icon(Icons.tune),
                 label: const Text('Adaptive test'),
               ),
               FilledButton.icon(
-                onPressed: _sessionController == null
+                onPressed: disabled
                     ? null
-                    : () => _runLongRunStabilityTest(),
+                    : () => _runExclusiveDebugAction(_runLongRunStabilityTest),
                 icon: const Icon(Icons.hourglass_bottom),
                 label: const Text('Long run stability test'),
               ),
