@@ -1,249 +1,274 @@
-# Audio Engine (Flutter + Native C++ Oboe via FFI)
+# Audio Engine — Flutter + Native C++ (Oboe) via FFI
 
-This project is a Flutter app with a native Android low-latency audio engine built in C++ using Oboe.
+A Flutter app with a native Android low-latency audio engine (C++/Oboe). It generates real-time tones, supports smooth parameter control and start/stop, and includes a **user-driven tinnitus frequency detection** module (Milestone 3) with coarse/fine search, sweep mode, and persistent storage.
 
-It is designed so that current behavior stays stable while architecture can grow safely:
-- Existing API behavior is preserved.
-- Existing start/stop behavior is preserved.
-- Existing click/pop protections are preserved.
-- New capabilities are optional and additive.
+---
+
+## Table of contents
+
+1. [What this project does](#1-what-this-project-does)
+2. [Milestones and features](#2-milestones-and-features)
+3. [Technology stack](#3-technology-stack)
+4. [Project flow — how it works](#4-project-flow--how-it-works)
+5. [Architecture and how things are interconnected](#5-architecture-and-how-things-are-interconnected)
+6. [What is used in this project](#6-what-is-used-in-this-project)
+7. [Important vs non-important](#7-important-vs-non-important)
+8. [Project structure (key files)](#8-project-structure-key-files)
+9. [Build and run](#9-build-and-run)
+10. [Validation and testing](#10-validation-and-testing)
+11. [Constraints and extension guidance](#11-constraints-and-extension-guidance)
+
+---
 
 ## 1. What this project does
 
-- Generates a real-time sine tone.
-- Supports runtime controls for:
-  - Frequency (Hz)
-  - Amplitude (0.0 to 1.0)
-  - Playback start/stop
-- Applies smoothing/ramping in native DSP to avoid zipper noise and clicks.
-- Includes debug/stability actions in the Flutter UI.
+- **Real-time sine tone** from a native oscillator (smoothed frequency, no clicks).
+- **Runtime controls**: frequency (Hz), amplitude (0–1), play/stop with smooth fades.
+- **Tinnitus frequency detection (M3)**: user finds their tone via coarse slider, fine ±1/±5 Hz buttons, optional upward/downward sweep (adjustable speed, interruptible), then **saves** the value; it **persists across app restarts**.
+- **Stability and debug**: M2 test panel (rapid params, start/stop cycles, extreme values) and session debug (sequence, adaptive, long-run tests).
+- **No audio artifacts**: parameter and transport changes are ramp-smoothed in native DSP; frequency changes are smoothed in the oscillator.
 
-## 2. Phase status (implemented)
+---
 
-- Phase 1: `VoiceManager` added in native layer.
-  - Supports multiple oscillators.
-  - Default remains one active voice (backward-compatible output behavior).
-- Phase 2: `EventScheduler` added.
-  - Stores timed parameter events.
-  - Not active in render callback yet.
-- Phase 3: High-precision frequency control added.
-  - Oscillator target and ramp now support double precision through optional API.
-- Phase 4: New API hooks exposed (not used by normal flow by default):
-  - `setTargetFrequency()`
-  - `scheduleSequence()`
-  - `startSession()`
-  - `stopSession()`
-- Phase 5: Flutter session layer added.
-  - `SessionController` introduced.
-  - Debug panel includes:
-    - Sequence test
-    - Adaptive test
-    - Long run stability test
+## 2. Milestones and features
+
+### Milestone 2 — Engine architecture and core parameter system
+
+- **Modular structure**: DSP core (Oscillator, ParameterSmoother) → parameter layer (atomics + ramps) → UI bindings (Flutter calls only `AudioEngine`).
+- **Unified API**: `setFrequency`, `setAmplitude`, `start`, `stop`, `isRunning` — single entry point for all control.
+- **Sample-accurate ramps**: amplitude and transport use one-pole smoothers per sample; no zipper noise or pops.
+- **Frequency control module**: real-time frequency changes with internal smoothing; stable under large jumps; same API used by M3.
+- **Clean start/stop**: ~20 ms fade-in/fade-out; stream kept open to avoid HAL pops.
+- **Test APK**: minimal UI with all parameters + M2 test panel.
+
+### Milestone 3 — Individual frequency detection module
+
+- **Coarse search**: slider 20–8000 Hz in 100 Hz steps for quick range finding.
+- **Fine search**: buttons −5, −1, +1, +5 Hz for precise matching.
+- **Sweep mode**: upward or downward sweep with selectable speed (slow / medium / fast); **interruptible at any time** (Stop leaves frequency at current value).
+- **Persistent storage**: “Save as my frequency” writes to local storage; “Saved frequency: X Hz” is shown; value **persists across app restarts**.
+- **Load saved**: applies the stored frequency to the engine so user can continue from last detection.
+- **Integration**: uses only `AudioEngine.setFrequency` (and existing start/stop/amplitude); no native/FFI changes; sweep timer cancelled on widget dispose.
+
+### Other (pre-existing / optional)
+
+- **VoiceManager** (native): multi-voice container; default remains one active voice.
+- **EventScheduler** (native): timed-event storage; not yet driven from render callback.
+- **SessionController** (Dart): optional session/debug orchestration; sequence / adaptive / long-run tests.
+- **High-precision API**: `setTargetFrequency`, `scheduleSequence`, `startSession`, `stopSession` — optional hooks; normal playback path unchanged.
+
+---
 
 ## 3. Technology stack
 
-- Flutter (UI, app lifecycle, state updates)
-- Dart FFI (`dart:ffi`) for Flutter <-> native bridge
-- C++17 for native engine and DSP
-- Oboe `com.google.oboe:oboe:1.10.0` for Android low-latency audio
-- CMake + Android NDK for native build
-- Kotlin/Gradle Android host app
+| Layer        | Technology |
+|-------------|------------|
+| UI / app    | Flutter, Dart 3.x |
+| Bridge      | Dart FFI (`dart:ffi`) |
+| Native API  | C ABI (bridge), C++17 |
+| Audio I/O   | Oboe (Android low-latency) |
+| Persistence (M3) | `shared_preferences` |
+| Build       | CMake, Android NDK, Gradle/Kotlin |
 
-## 4. Platform support
+- **Platform**: Native audio runs **only on Android**. On other platforms the app shows “Native audio only on Android”.
 
-- UI builds on multiple Flutter platforms.
-- Native audio runtime is Android-only.
-- On non-Android platforms, app shows: `Native audio only on Android`.
+---
 
-## 5. Architecture and interconnection
+## 4. Project flow — how it works
+
+### A. App startup
+
+1. `main.dart` runs the app and shows `HomeScreen`.
+2. `HomeScreen.initState()` → `_initEngine()`:
+   - If not Android → set error message and show error UI; **stop**.
+   - If Android:
+     - Load `libnative_audio.so`, create `NativeBindings`, create `AudioEngine`, call `init()` (→ native `audio_create()`).
+     - Set initial frequency and amplitude on the engine.
+     - Create `SessionController` with the engine and callbacks (for session/debug).
+3. **M3**: When the user opens the “Tinnitus frequency detection” section, it loads saved frequency from storage (if any) and displays “Saved frequency: X Hz”. It does **not** change the engine frequency until the user uses coarse/fine/sweep or taps “Load saved”.
+
+### B. Normal playback (Play/Stop)
+
+1. User taps **Play** → `AudioEngine.start()` → FFI `audio_start()` → native `AudioEngine::start()`:
+   - First time: open Oboe output stream, configure amplitude and transport smoothers, ramp transport to 1 (~20 ms), start stream.
+   - Later: reuse existing stream, set transport target to 1 again (fade in).
+2. User taps **Stop** → `AudioEngine.stop()` → native sets transport target to 0; output fades out; **stream is not closed** (avoids device pops on next start).
+
+### C. Real-time parameter updates (sliders / detection)
+
+1. **Main sliders**: User moves frequency or amplitude slider → `HomeScreen` calls `_engine.setFrequency(v)` or `_engine.setAmplitude(v)` → FFI → native stores **atomic target** → audio callback each sample runs **smoothers** (amplitude, transport) and **oscillator** (frequency smoothed internally) → output is artifact-free.
+2. **Tinnitus detection section**: Coarse slider, fine buttons, or sweep timer update a local “detection frequency” value (clamped 20–8000 Hz), then call `engine.setFrequency(value)`. Same path as above: native target + per-sample smoothing. **Sweep** uses a Dart `Timer.periodic` to step frequency; when user taps **Stop sweep**, the timer is cancelled and the current frequency is kept.
+
+### D. Saving and loading detected frequency (M3)
+
+1. **Save**: User taps “Save as my frequency” → `DetectedFrequencyStorage.saveDetectedFrequency(currentHz)` → value clamped to 20–8000 Hz and written to `SharedPreferences` under key `detected_tinnitus_frequency` → UI shows SnackBar and “Saved frequency: X Hz”.
+2. **Load**: User taps “Load saved” → `DetectedFrequencyStorage.loadDetectedFrequency()` → read from storage → apply to detection frequency notifier and call `engine.setFrequency(loaded)` so the tone matches the saved value.
+3. **Persistence**: After app restart, the same key is read when the detection section is used; “Saved frequency: X Hz” appears; user can tap “Load saved” to apply it again.
+
+### E. Dispose and cleanup
+
+1. When `HomeScreen` is disposed: `SessionController.dispose()`, then `AudioEngine.dispose()` → FFI `audio_destroy()` → native engine stops/closes stream and is deleted.
+2. **TinnitusDetectionSection** disposes its sweep timer (if any) and its frequency notifier so no callbacks run after the widget is gone.
+
+---
+
+## 5. Architecture and how things are interconnected
 
 ### Layered architecture
 
-1. Flutter UI layer (`lib/ui/*`)
-   - Displays controls and debug panels.
-   - Never calls native symbols directly.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Flutter UI (lib/ui/)                                            │
+│  HomeScreen, FrequencySlider, AmplitudeSlider,                    │
+│  TinnitusDetectionSection (M3)                                   │
+│  → Only calls AudioEngine; never touches FFI or native directly  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                 │
+┌───────────────────────────────▼─────────────────────────────────┐
+│  Dart engine facade (lib/engine/audio_engine.dart)               │
+│  AudioEngine: init, start, stop, isRunning,                      │
+│  setFrequency, setAmplitude, (setTargetFrequency, session APIs)  │
+│  → Single app-facing API; owns native handle lifecycle            │
+└───────────────────────────────┬─────────────────────────────────┘
+                                 │
+┌───────────────────────────────▼─────────────────────────────────┐
+│  Dart bindings (lib/engine/bindings.dart)                        │
+│  NativeBindings: lookup of audio_* C symbols                     │
+│  → Used only by AudioEngine; not by UI                           │
+└───────────────────────────────┬─────────────────────────────────┘
+                                 │  FFI
+┌───────────────────────────────▼─────────────────────────────────┐
+│  C ABI bridge (android/.../cpp/ffi/bridge.h, bridge.cpp)         │
+│  audio_create, audio_destroy, audio_start, audio_stop,           │
+│  audio_is_running, audio_set_frequency, audio_set_amplitude, ...  │
+│  → Thin wrappers; delegate to C++ AudioEngine                    │
+└───────────────────────────────┬─────────────────────────────────┘
+                                 │
+┌───────────────────────────────▼─────────────────────────────────┐
+│  Native engine (android/.../cpp/engine/AudioEngine.*)            │
+│  Oboe stream lifecycle, onAudioReady callback,                    │
+│  transport + amplitude smoothers, VoiceManager (→ Oscillator)    │
+└───────────────────────────────┬─────────────────────────────────┘
+                                 │
+┌───────────────────────────────▼─────────────────────────────────┐
+│  DSP / support (engine/Oscillator.*, ParameterSmoother.*,       │
+│  VoiceManager.*, EventScheduler.*)                                │
+│  → Oscillator: smoothed frequency, sine output                  │
+│  → ParameterSmoother: per-sample ramp for amplitude & transport   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-2. Dart engine facade (`lib/engine/audio_engine.dart`)
-   - Single app-facing engine API.
-   - Owns the native handle lifecycle.
+### M3-specific interconnection
 
-3. Dart bindings layer (`lib/engine/bindings.dart`)
-   - Symbol lookup and typed FFI wrappers.
+```
+HomeScreen
+  └─ TinnitusDetectionSection(engine: _engine)
+       ├─ Coarse slider / Fine buttons / Sweep
+       │    → _detectionFrequency (ValueNotifier)
+       │    → listener calls engine.setFrequency(clamped)
+       ├─ Save button
+       │    → DetectedFrequencyStorage.saveDetectedFrequency(...)
+       │    → SharedPreferences (key: detected_tinnitus_frequency)
+       └─ Load saved
+            → DetectedFrequencyStorage.loadDetectedFrequency()
+            → engine.setFrequency(loaded), update UI
 
-4. C ABI bridge (`android/app/src/main/cpp/ffi/bridge.*`)
-   - Thin C functions exported to FFI.
-   - Delegates to C++ `AudioEngine`.
+DetectedFrequencyStorage (lib/storage/detected_frequency_storage.dart)
+  └─ shared_preferences
+       └─ key: 'detected_tinnitus_frequency', value: double (20–8000 Hz)
+```
 
-5. Native engine core (`android/app/src/main/cpp/engine/AudioEngine.*`)
-   - Stream lifecycle, render callback, start/stop transport ramp.
+- **No direct link from UI to native/FFI**: All control goes through `AudioEngine`. M3 reuses the same `setFrequency` path as the main slider.
+- **SessionController**: Uses `AudioEngine` (via `AudioControl` interface) and callbacks to sync frequency/amplitude/playing state with `HomeScreen` for session/debug flows; does not drive M3 detection.
 
-6. Native DSP/support modules
-   - `Oscillator.*`: sine generator + smoothed frequency ramp
-   - `ParameterSmoother.*`: amplitude/transport one-pole smoothing
-   - `VoiceManager.*`: multi-voice container (default 1 active voice)
-   - `EventScheduler.*`: timed-event storage scaffold (passive for now)
+---
 
-### Interconnection map
+## 6. What is used in this project
 
-`HomeScreen / SessionController`  
--> `AudioEngine` (Dart facade)  
--> `NativeBindings` (Dart FFI wrappers)  
--> `audio_*` C ABI symbols  
--> `AudioEngine` (C++)  
--> `VoiceManager / ParameterSmoother / EventScheduler / Oscillator`  
--> Oboe callback output (`onAudioReady`)
+| Component | Purpose | Used by |
+|-----------|--------|--------|
+| **AudioEngine** (Dart) | Single API for playback and parameters | HomeScreen, SessionController, TinnitusDetectionSection |
+| **NativeBindings** | FFI symbol lookup and typed wrappers | AudioEngine only |
+| **bridge.h / bridge.cpp** | C ABI for Dart FFI | Native build; called from Dart via bindings |
+| **AudioEngine** (C++) | Stream, transport, amplitude, voice routing | bridge, Oscillator, ParameterSmoother, VoiceManager |
+| **Oscillator** | Sine wave, smoothed frequency | AudioEngine render path |
+| **ParameterSmoother** | Per-sample ramp (amplitude, transport) | AudioEngine render path |
+| **VoiceManager** | Multi-voice container (default 1 voice) | AudioEngine |
+| **EventScheduler** | Timed events (passive until wired) | Native engine (optional) |
+| **SessionController** | Session/debug orchestration | HomeScreen |
+| **DetectedFrequencyStorage** | Save/load detected frequency (M3) | TinnitusDetectionSection |
+| **shared_preferences** | Persistent key-value store (M3) | DetectedFrequencyStorage |
+| **FrequencySlider / AmplitudeSlider** | Main screen sliders | HomeScreen |
+| **TinnitusDetectionSection** | Coarse/fine/sweep/save/load UI (M3) | HomeScreen |
 
-## 6. End-to-end runtime flow
+---
 
-### A. Startup flow
+## 7. Important vs non-important
 
-1. `main.dart` loads `HomeScreen`.
-2. `HomeScreen` checks platform.
-3. On Android:
-   - Loads `libnative_audio.so`.
-   - Creates `NativeBindings`.
-   - Creates Dart `AudioEngine`, calls `init()` -> native `audio_create()`.
-   - Sets initial frequency/amplitude defaults.
-   - Creates `SessionController` (optional debug orchestration).
+### Important (critical — must preserve)
 
-### B. Normal playback start flow
+- **No regressions** in `start()` / `stop()`: smooth fades, stream reuse, no pops.
+- **No breaking changes** to existing engine API (`setFrequency`, `setAmplitude`, `start`, `stop`, `isRunning`, `init`, `dispose`).
+- **No audio artifacts**: parameter and transport changes must remain ramp-smoothed; frequency changes must remain smoothed in the oscillator.
+- **Real-time safety**: audio callback must not block; no mutex in the callback; only atomics and lock-free smoothers.
+- **FFI contract**: C ABI symbol names and signatures must match Dart bindings.
+- **Default behavior**: one active voice, normal playback path unchanged when M3 or session features are used.
+- **M3**: Sweep timer must be cancelled on widget dispose; frequency must be clamped to 20–8000 Hz before engine and storage; persistence key must stay consistent.
 
-1. User presses Play.
-2. Flutter calls `AudioEngine.start()`.
-3. FFI calls `audio_start()`.
-4. Native `AudioEngine::start()`:
-   - Opens Oboe stream on first start.
-   - Configures smoothing ramps.
-   - Uses transport ramp-up (fade in).
-   - Keeps stream for reuse across stop/start cycles.
+### Non-important (lower priority for correctness)
 
-### C. Real-time parameter flow
+- Visual theme, colors, icons, exact layout of panels.
+- Wording of labels and docs.
+- Non-Android platform boilerplate (iOS/Windows/etc. for non-audio).
+- Optional APIs (`setTargetFrequency`, `scheduleSequence`, `startSession`, `stopSession`) as long as they remain opt-in and do not affect the default path.
 
-1. UI slider or test action updates frequency/amplitude.
-2. Dart facade calls FFI setters.
-3. Native layer updates targets (thread-safe atomics).
-4. Audio callback applies per-sample smoothing/ramping:
-   - Transport smoother
-   - Amplitude smoother
-   - VoiceManager output (currently 1 active voice by default)
+---
 
-### D. Stop flow
+## 8. Project structure (key files)
 
-1. User presses Stop.
-2. Flutter calls `AudioEngine.stop()`.
-3. Native `AudioEngine::stop()` sets transport target to 0.
-4. Output fades out smoothly; stream is not torn down immediately.
+```
+lib/
+  main.dart                    # App entrypoint
+  engine/
+    audio_engine.dart          # Unified Dart engine API
+    audio_control.dart         # Minimal interface for session/testing
+    bindings.dart              # FFI bindings (used only by AudioEngine)
+    ffi_types.dart             # Native handle type
+  storage/
+    detected_frequency_storage.dart   # M3: save/load detected frequency
+  session/
+    session_controller.dart    # Optional session/debug orchestration
+  ui/
+    home_screen.dart           # Main screen: sliders, Play/Stop, M2/M3/session panels
+    tinnitus_detection_section.dart   # M3: coarse/fine/sweep/save/load
+    widgets/
+      frequency_slider.dart
+      amplitude_slider.dart
 
-### E. Dispose flow
+android/app/src/main/cpp/
+  ffi/
+    bridge.h, bridge.cpp       # C ABI for FFI
+  engine/
+    AudioEngine.h, .cpp        # Stream, callback, smoothers, voice routing
+    Oscillator.h, .cpp         # Sine + frequency smoothing
+    ParameterSmoother.h, .cpp  # One-pole ramp
+    VoiceManager.*             # Multi-voice (default 1)
+    EventScheduler.*           # Timed events (passive)
 
-1. Flutter widget disposes engine.
-2. Dart calls `audio_destroy()`.
-3. Native engine stops/closes stream and releases resources.
+docs/
+  M2_ENGINE_ARCHITECTURE.md    # M2 technical notes
+  M3_FREQUENCY_DETECTION.md    # M3 technical notes + acceptance checklist
+```
 
-### F. Optional session/scheduler flow (currently non-default)
+---
 
-- `setTargetFrequency(double)`:
-  - Uses high-precision frequency target path.
-- `scheduleSequence()`:
-  - Loads default scheduler events into `EventScheduler`.
-- `startSession()` / `stopSession()`:
-  - Toggles session state in scheduler.
-- Current status:
-  - Scheduler events are stored but not consumed by `onAudioReady()` yet.
-  - Normal playback path remains unchanged.
-
-## 7. Public APIs
-
-### Dart facade (`AudioEngine`)
-
-- Existing stable API:
-  - `init()`
-  - `start()`
-  - `stop()`
-  - `isRunning`
-  - `setFrequency(double)`
-  - `setAmplitude(double)`
-  - `dispose()`
-- Optional new API:
-  - `setTargetFrequency(double)`
-  - `scheduleSequence()`
-  - `startSession()`
-  - `stopSession()`
-
-### Native C ABI exports (`bridge.h`)
-
-- Lifecycle/state:
-  - `audio_create`, `audio_destroy`, `audio_start`, `audio_stop`, `audio_is_running`
-- Existing parameter control:
-  - `audio_set_frequency`, `audio_set_amplitude`
-- Optional new hooks:
-  - `audio_set_target_frequency`
-  - `audio_schedule_sequence`
-  - `audio_start_session`
-  - `audio_stop_session`
-
-## 8. Flutter UI and debug controls
-
-### Main controls
-
-- Frequency slider
-- Amplitude slider
-- Play/Stop floating action button
-
-### Debug sections
-
-- `Milestone 02 tests`:
-  - Rapid params
-  - Start/stop x10
-  - Extreme values
-- `Session debug`:
-  - Sequence test
-  - Adaptive test
-  - Long run stability test
-
-## 9. Important vs non-important
-
-### Important (critical, must preserve)
-
-- No regressions in `start()/stop()` behavior.
-- No API break for existing engine calls.
-- No audio artifacts from parameter changes or transport changes.
-- Keep render callback real-time safe (no blocking/heavy work).
-- Preserve FFI symbol consistency between Dart and C++.
-- Keep default one-voice output behavior unless explicitly changed.
-- Keep scheduler features optional and non-disruptive.
-
-### Non-important (low priority for core audio correctness)
-
-- Visual theme/colors/animations.
-- UI icon choices and layout details.
-- Non-audio platform boilerplate files.
-- Documentation wording style.
-
-## 10. Project structure (key files)
-
-- `lib/main.dart` - app entrypoint.
-- `lib/ui/home_screen.dart` - main UI, controls, debug panels.
-- `lib/session/session_controller.dart` - optional test orchestrator.
-- `lib/engine/audio_engine.dart` - unified Dart engine API.
-- `lib/engine/bindings.dart` - FFI bindings.
-- `lib/engine/ffi_types.dart` - native handle types.
-- `android/app/src/main/cpp/ffi/bridge.h/.cpp` - native C ABI for FFI.
-- `android/app/src/main/cpp/engine/AudioEngine.*` - core stream and callback logic.
-- `android/app/src/main/cpp/engine/Oscillator.*` - oscillator + frequency ramp.
-- `android/app/src/main/cpp/engine/ParameterSmoother.*` - smoothing utility.
-- `android/app/src/main/cpp/engine/VoiceManager.*` - optional multi-voice management.
-- `android/app/src/main/cpp/engine/EventScheduler.*` - passive scheduling scaffold.
-- `android/app/src/main/cpp/CMakeLists.txt` - native library build target.
-- `test/widget_test.dart` - platform-aware smoke test.
-
-## 11. Build and run
+## 9. Build and run
 
 ### Prerequisites
 
 - Flutter SDK
 - Android SDK + NDK
-- Android device/emulator
+- Android device or emulator
 
 ### Commands
 
@@ -253,33 +278,51 @@ flutter pub get
 flutter run
 ```
 
-### Quality checks
+For a debug APK:
+
+```bash
+flutter build apk --debug
+```
+
+### Dependencies (from pubspec)
+
+- `flutter`, `cupertino_icons`
+- `shared_preferences` (M3 persistence)
+
+---
+
+## 10. Validation and testing
+
+### Quick checks
+
+- **Play**: smooth fade-in, no pop.
+- **Stop**: smooth fade-out, no pop.
+- **Sliders**: move frequency and amplitude rapidly; no clicks or zipper noise.
+- **M2 tests**: Rapid params, Start/stop x10, Extreme values — app stays stable.
+- **M3**: Coarse/fine move tone in real time; sweep runs and stops immediately; Save → restart → “Saved frequency” shown → Load saved applies value; no crashes on rapid or large frequency changes.
+
+### Automated
 
 ```bash
 flutter analyze
 flutter test
 ```
 
-## 12. Validation checklist
+### Detailed checklists
 
-- Start playback: smooth fade-in, no pop.
-- Stop playback: smooth fade-out, no pop.
-- Rapidly move frequency slider: no clicks/crackle.
-- Rapidly move amplitude slider: no zipper noise.
-- Run Milestone 02 test buttons: app remains stable.
-- Run Session debug buttons: app remains stable.
-- Verify optional APIs are callable and do not change normal flow unless used.
+- **M2**: See `docs/M2_ENGINE_ARCHITECTURE.md` (section 6).
+- **M3**: See `docs/M3_FREQUENCY_DETECTION.md` (Acceptance checklist).
 
-## 13. Constraints and notes
+---
 
-- Native audio output path is Android-only.
-- Oboe engine config expects low-latency path and compatible device support.
-- There are two `MainActivity.kt` files in different package folders; Gradle namespace/applicationId is `com.audio.audio_engine`.
+## 11. Constraints and extension guidance
 
-## 14. Extension guidance
+- **Platform**: Native audio is Android-only. Other platforms show “Native audio only on Android”.
+- **Oboe**: Low-latency path; behavior may depend on device and Android version.
+- **Package**: There are two `MainActivity.kt` locations; the app package is `com.audio.audio_engine`.
 
-- Add future modules through `AudioEngine` facade first.
-- Keep C ABI thin and stable.
-- Keep optional features opt-in.
-- If scheduler is activated in future, introduce it behind a guarded path and re-verify artifact-free behavior.
+### Extending the project
 
+- Add features through the **AudioEngine** (Dart) API first; keep the C ABI thin and stable.
+- Keep optional features (scheduler, session, high-precision) opt-in so the default playback path stays unchanged.
+- If you add more native DSP or callbacks, keep the render path real-time safe (no blocking, no heavy work in the callback).

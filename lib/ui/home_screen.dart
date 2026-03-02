@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
 import '../session/session_controller.dart';
+import 'tinnitus_detection_section.dart';
 import 'widgets/amplitude_slider.dart';
 import 'widgets/frequency_slider.dart';
 
@@ -321,6 +322,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildM2TestSection(),
                 const SizedBox(height: 12),
                 _buildSessionDebugSection(),
+                const SizedBox(height: 12),
+                TinnitusDetectionSection(engine: _engine),
               ],
             ),
           ),
