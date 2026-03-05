@@ -21,10 +21,7 @@ enum SweepSpeed {
 /// speed, interruptible), and persistent save/load of detected frequency.
 /// All control goes through [engine]; does not modify native/FFI directly.
 class TinnitusDetectionSection extends StatefulWidget {
-  const TinnitusDetectionSection({
-    super.key,
-    required this.engine,
-  });
+  const TinnitusDetectionSection({super.key, required this.engine});
 
   final AudioEngine? engine;
 
@@ -135,6 +132,7 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
   Widget build(BuildContext context) {
     final engine = widget.engine;
     return ExpansionTile(
+      initiallyExpanded: true,
       title: const Text('Tinnitus frequency detection'),
       subtitle: const Text(
         'Coarse / fine search, sweep, save detected frequency',
@@ -163,7 +161,10 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
                 },
               ),
               const SizedBox(height: 12),
-              const Text('Coarse (100 Hz steps)', style: TextStyle(fontSize: 12)),
+              const Text(
+                'Coarse (100 Hz steps)',
+                style: TextStyle(fontSize: 12),
+              ),
               ValueListenableBuilder<double>(
                 valueListenable: _detectionFrequency,
                 builder: (context, value, _) {
@@ -192,29 +193,25 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
                     label: '-5',
                     onPressed: engine == null
                         ? null
-                        : () => _applyFrequency(
-                            _detectionFrequency.value - 5),
+                        : () => _applyFrequency(_detectionFrequency.value - 5),
                   ),
                   _FineButton(
                     label: '-1',
                     onPressed: engine == null
                         ? null
-                        : () => _applyFrequency(
-                            _detectionFrequency.value - 1),
+                        : () => _applyFrequency(_detectionFrequency.value - 1),
                   ),
                   _FineButton(
                     label: '+1',
                     onPressed: engine == null
                         ? null
-                        : () => _applyFrequency(
-                            _detectionFrequency.value + 1),
+                        : () => _applyFrequency(_detectionFrequency.value + 1),
                   ),
                   _FineButton(
                     label: '+5',
                     onPressed: engine == null
                         ? null
-                        : () => _applyFrequency(
-                            _detectionFrequency.value + 5),
+                        : () => _applyFrequency(_detectionFrequency.value + 5),
                   ),
                 ],
               ),
@@ -228,10 +225,10 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
                     value: _sweepSpeed,
                     isExpanded: false,
                     items: SweepSpeed.values
-                        .map((s) => DropdownMenuItem(
-                              value: s,
-                              child: Text(s.name),
-                            ))
+                        .map(
+                          (s) =>
+                              DropdownMenuItem(value: s, child: Text(s.name)),
+                        )
                         .toList(),
                     onChanged: _sweepActive
                         ? null
@@ -271,7 +268,9 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
                     label: const Text('Save as my frequency'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: _savedFrequency == null ? null : _loadAndApplySaved,
+                    onPressed: _savedFrequency == null
+                        ? null
+                        : _loadAndApplySaved,
                     icon: const Icon(Icons.refresh, size: 18),
                     label: const Text('Load saved'),
                   ),
@@ -293,9 +292,6 @@ class _FineButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.tonal(
-      onPressed: onPressed,
-      child: Text(label),
-    );
+    return FilledButton.tonal(onPressed: onPressed, child: Text(label));
   }
 }
