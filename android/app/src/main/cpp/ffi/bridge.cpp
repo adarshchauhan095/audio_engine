@@ -1,5 +1,6 @@
 #include "bridge.h"          // Includes the FFI bridge declarations.
 #include "../engine/AudioEngine.h" // Includes the C++ AudioEngine class definition.
+#include "../engine/TherapyConfig.h"
 
 /// @brief Implements `audio_create()` from `bridge.h`.
 /// Creates a new instance of the `AudioEngine` class on the heap and returns
@@ -78,4 +79,35 @@ void audio_start_session(NativeAudioHandle h) {
 /// @brief Implements `audio_stop_session()` from `bridge.h`.
 void audio_stop_session(NativeAudioHandle h) {
   static_cast<AudioEngine*>(h)->stopSession();
+}
+
+static TherapyConfig createConfig(int subthreshold, int rmp, int pip, int sidebands, int binaural, float intensity, float baseFreq, float baseAmp) {
+    TherapyConfig c;
+    c.enableSubthreshold = subthreshold != 0;
+    c.enableRMP = rmp != 0;
+    c.enablePIP = pip != 0;
+    c.enableSidebands = sidebands != 0;
+    c.enableBinaural = binaural != 0;
+    c.therapyIntensity = intensity;
+    return c;
+}
+
+void audio_therapy_start(NativeAudioHandle h, int subthreshold, int rmp, int pip, int sidebands, int binaural, float intensity, float baseFreq, float baseAmp) {
+    static_cast<AudioEngine*>(h)->therapyStart(createConfig(subthreshold, rmp, pip, sidebands, binaural, intensity, baseFreq, baseAmp));
+}
+
+void audio_therapy_update(NativeAudioHandle h, int subthreshold, int rmp, int pip, int sidebands, int binaural, float intensity, float baseFreq, float baseAmp) {
+    static_cast<AudioEngine*>(h)->therapyUpdate(createConfig(subthreshold, rmp, pip, sidebands, binaural, intensity, baseFreq, baseAmp));
+}
+
+void audio_therapy_stop(NativeAudioHandle h) {
+    static_cast<AudioEngine*>(h)->therapyStop();
+}
+
+void audio_set_stereo_enabled(NativeAudioHandle h, int enabled) {
+    static_cast<AudioEngine*>(h)->setStereoEnabled(enabled != 0);
+}
+
+void audio_register_log_callback(NativeAudioHandle h, AudioLogCallback cb) {
+    static_cast<AudioEngine*>(h)->setLogCallback(cb);
 }

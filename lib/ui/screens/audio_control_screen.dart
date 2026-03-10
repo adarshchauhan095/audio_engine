@@ -11,8 +11,9 @@ class AudioControlScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
+    return Scaffold(
+      appBar: AppBar(title: const Text('Audio Controls')),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
@@ -49,7 +50,7 @@ class AudioControlScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     const Text(
                       'This page controls live tone playback only. '
-                      'Testing, tinnitus detection, and patient sessions are independent screens.',
+                      'Testing, tinnitus detection, and profile sessions are independent screens.',
                     ),
                   ],
                 ),

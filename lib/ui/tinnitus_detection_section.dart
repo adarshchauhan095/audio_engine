@@ -34,11 +34,14 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
   /// Current frequency used for detection (coarse/fine/sweep). Clamped to valid range.
   final ValueNotifier<double> _detectionFrequency = ValueNotifier(440.0);
 
+  /// Amplitude setting for the detection playback volume.
+  final ValueNotifier<double> _amplitude = ValueNotifier(0.3);
+
   /// Saved frequency loaded from storage; null until first load or if never saved.
   double? _savedFrequency;
 
   bool _sweepActive = false;
-  SweepSpeed _sweepSpeed = SweepSpeed.medium;
+  final ValueNotifier<double> _sweepProgress = ValueNotifier(0.0);
   Timer? _sweepTimer;
   static const int _sweepIntervalMs = 50;
 
@@ -55,6 +58,8 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
     _sweepTimer = null;
     _detectionFrequency.removeListener(_onDetectionFrequencyChanged);
     _detectionFrequency.dispose();
+    _amplitude.dispose();
+    _sweepProgress.dispose();
     super.dispose();
   }
 
@@ -82,12 +87,17 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
     _detectionFrequency.value = clamped;
   }
 
-  void _startSweep(bool upward) {
+  void _startSweep(bool upward, SweepSpeed speed) {
     if (widget.engine == null || _sweepActive) return;
     _sweepActive = true;
+    _sweepProgress.value = 0.0;
     setState(() {});
-    final speed = _sweepSpeed.hzPerSecond;
-    final step = speed * (_sweepIntervalMs / 1000.0) * (upward ? 1 : -1);
+    final speedValue = speed.hzPerSecond;
+    final step = speedValue * (_sweepIntervalMs / 1000.0) * (upward ? 1 : -1);
+    final targetHz = upward ? kMaxFrequencyHz : kMinFrequencyHz;
+    final startHz = _detectionFrequency.value;
+    final totalDiff = (targetHz - startHz).abs();
+
     _sweepTimer = Timer.periodic(
       const Duration(milliseconds: _sweepIntervalMs),
       (_) {
@@ -95,8 +105,14 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
         double next = _detectionFrequency.value + step;
         next = _clamp(next);
         _detectionFrequency.value = next;
+        
+        if (totalDiff > 0) {
+          _sweepProgress.value = ((next - startHz).abs() / totalDiff).clamp(0.0, 1.0);
+        }
+
         if (next <= kMinFrequencyHz || next >= kMaxFrequencyHz) {
           _stopSweep();
+          widget.engine?.stop(); // Auto stop playback when detection sweep is completed
         }
       },
     );
@@ -182,81 +198,108 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
                   );
                 },
               ),
-              const SizedBox(height: 8),
-              const Text('Fine adjustment', style: TextStyle(fontSize: 12)),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _FineButton(
-                    label: '-5',
-                    onPressed: engine == null
-                        ? null
-                        : () => _applyFrequency(_detectionFrequency.value - 5),
-                  ),
-                  _FineButton(
-                    label: '-1',
-                    onPressed: engine == null
-                        ? null
-                        : () => _applyFrequency(_detectionFrequency.value - 1),
-                  ),
-                  _FineButton(
-                    label: '+1',
-                    onPressed: engine == null
-                        ? null
-                        : () => _applyFrequency(_detectionFrequency.value + 1),
-                  ),
-                  _FineButton(
-                    label: '+5',
-                    onPressed: engine == null
-                        ? null
-                        : () => _applyFrequency(_detectionFrequency.value + 5),
-                  ),
-                ],
-              ),
               const SizedBox(height: 16),
-              const Text('Sweep', style: TextStyle(fontSize: 12)),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  DropdownButton<SweepSpeed>(
-                    value: _sweepSpeed,
-                    isExpanded: false,
-                    items: SweepSpeed.values
-                        .map(
-                          (s) =>
-                              DropdownMenuItem(value: s, child: Text(s.name)),
-                        )
-                        .toList(),
-                    onChanged: _sweepActive
+              const Text('Volume / Amplitude', style: TextStyle(fontSize: 12)),
+              ValueListenableBuilder<double>(
+                valueListenable: _amplitude,
+                builder: (context, value, _) {
+                  return Slider(
+                    value: value,
+                    min: 0.0,
+                    max: 1.0,
+                    divisions: 100,
+                    label: value.toStringAsFixed(2),
+                    onChanged: engine == null
                         ? null
                         : (v) {
-                            if (v != null) setState(() => _sweepSpeed = v);
+                            _amplitude.value = v;
+                            engine.setAmplitude(v);
                           },
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              const Text('Fine adjustment & Sweep (Tap: step, Hold: sweep)', style: TextStyle(fontSize: 12)),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _SweepButton(
+                    icon: const Icon(Icons.keyboard_double_arrow_left, size: 18),
+                    label: const Text('-5 Hz'),
+                    onTap: engine == null || _sweepActive ? null : () => _applyFrequency(_detectionFrequency.value - 5),
+                    onLongPressStart: engine == null || _sweepActive ? null : () => _startSweep(false, SweepSpeed.medium),
+                    onLongPressEnd: engine == null ? null : _stopSweep,
                   ),
-                  FilledButton.icon(
-                    onPressed: engine == null || _sweepActive
-                        ? null
-                        : () => _startSweep(true),
-                    icon: const Icon(Icons.arrow_upward, size: 18),
-                    label: const Text('Sweep up'),
+                  _SweepButton(
+                    icon: const Icon(Icons.keyboard_arrow_left, size: 18),
+                    label: const Text('-1 Hz'),
+                    onTap: engine == null || _sweepActive ? null : () => _applyFrequency(_detectionFrequency.value - 1),
+                    onLongPressStart: engine == null || _sweepActive ? null : () => _startSweep(false, SweepSpeed.slow),
+                    onLongPressEnd: engine == null ? null : _stopSweep,
                   ),
-                  FilledButton.icon(
-                    onPressed: engine == null || _sweepActive
-                        ? null
-                        : () => _startSweep(false),
-                    icon: const Icon(Icons.arrow_downward, size: 18),
-                    label: const Text('Sweep down'),
+                  _SweepButton(
+                    icon: const Icon(Icons.keyboard_arrow_right, size: 18),
+                    label: const Text('+1 Hz'),
+                    onTap: engine == null || _sweepActive ? null : () => _applyFrequency(_detectionFrequency.value + 1),
+                    onLongPressStart: engine == null || _sweepActive ? null : () => _startSweep(true, SweepSpeed.slow),
+                    onLongPressEnd: engine == null ? null : _stopSweep,
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: _sweepActive ? _stopSweep : null,
-                    icon: const Icon(Icons.stop, size: 18),
-                    label: const Text('Stop'),
+                  _SweepButton(
+                    icon: const Icon(Icons.keyboard_double_arrow_right, size: 18),
+                    label: const Text('+5 Hz'),
+                    onTap: engine == null || _sweepActive ? null : () => _applyFrequency(_detectionFrequency.value + 5),
+                    onLongPressStart: engine == null || _sweepActive ? null : () => _startSweep(true, SweepSpeed.medium),
+                    onLongPressEnd: engine == null ? null : _stopSweep,
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              const Text('Auto Sweep', style: TextStyle(fontSize: 12)),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: engine == null || _sweepActive ? null : () => _startSweep(false, SweepSpeed.medium),
+                    icon: const Icon(Icons.keyboard_double_arrow_left, size: 18),
+                    label: const Text('Auto -5 Hz'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: engine == null || _sweepActive ? null : () => _startSweep(false, SweepSpeed.slow),
+                    icon: const Icon(Icons.keyboard_arrow_left, size: 18),
+                    label: const Text('Auto -1 Hz'),
+                  ),
+                  if (_sweepActive)
+                    FilledButton.icon(
+                      onPressed: _stopSweep,
+                      icon: const Icon(Icons.stop, size: 18),
+                      label: const Text('Stop Auto Sweep'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                        foregroundColor: Theme.of(context).colorScheme.onError,
+                      ),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: engine == null || _sweepActive ? null : () => _startSweep(true, SweepSpeed.slow),
+                    icon: const Icon(Icons.keyboard_arrow_right, size: 18),
+                    label: const Text('Auto +1 Hz'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: engine == null || _sweepActive ? null : () => _startSweep(true, SweepSpeed.medium),
+                    icon: const Icon(Icons.keyboard_double_arrow_right, size: 18),
+                    label: const Text('Auto +5 Hz'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_sweepActive)
+                ValueListenableBuilder<double>(
+                  valueListenable: _sweepProgress,
+                  builder: (context, progress, _) => LinearProgressIndicator(value: progress, minHeight: 4),
+                ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -284,14 +327,60 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
   }
 }
 
-class _FineButton extends StatelessWidget {
-  const _FineButton({required this.label, this.onPressed});
+class _SweepButton extends StatelessWidget {
+  const _SweepButton({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.onLongPressStart,
+    this.onLongPressEnd,
+  });
 
-  final String label;
-  final VoidCallback? onPressed;
+  final Widget icon;
+  final Widget label;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPressStart;
+  final VoidCallback? onLongPressEnd;
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.tonal(onPressed: onPressed, child: Text(label));
+    return GestureDetector(
+      onTap: onTap,
+      onLongPressStart: onLongPressStart == null ? null : (_) => onLongPressStart!(),
+      onLongPressEnd: onLongPressEnd == null ? null : (_) => onLongPressEnd!(),
+      onLongPressCancel: onLongPressEnd,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: onTap == null
+              ? Theme.of(context).colorScheme.surfaceContainerHighest
+              : Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconTheme(
+              data: IconThemeData(
+                color: onTap == null
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+              child: icon,
+            ),
+            const SizedBox(width: 8),
+            DefaultTextStyle(
+              style: TextStyle(
+                color: onTap == null
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : Theme.of(context).colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w500,
+              ),
+              child: label,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

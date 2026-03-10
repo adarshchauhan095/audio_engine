@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'ui/app_shell.dart';
+
+import 'ui/screens/dashboard_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,7 +17,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const AppShell(),
+      home: const DashboardScreen(),
     );
   }
 }

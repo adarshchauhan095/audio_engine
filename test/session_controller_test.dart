@@ -19,6 +19,11 @@ class _FakeAudioControl implements AudioControl {
   }
 
   @override
+  void stop() {
+    _running = false;
+  }
+
+  @override
   void setAmplitude(double amp) {
     setAmplitudeCalls++;
   }

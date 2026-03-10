@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../models/session_params.dart';
 import '../../session/audio_runtime_controller.dart';
-import '../../session/patient_session_catalog.dart';
+import '../../session/profile_session_catalog.dart';
 import '../../storage/session_params_storage.dart';
 
-class PatientSessionsScreen extends StatefulWidget {
-  const PatientSessionsScreen({
+class ProfileSessionsScreen extends StatefulWidget {
+  const ProfileSessionsScreen({
     super.key,
     required this.runtime,
     required this.onOpenSavedParams,
@@ -16,21 +16,21 @@ class PatientSessionsScreen extends StatefulWidget {
   final VoidCallback onOpenSavedParams;
 
   @override
-  State<PatientSessionsScreen> createState() => _PatientSessionsScreenState();
+  State<ProfileSessionsScreen> createState() => _ProfileSessionsScreenState();
 }
 
-class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
-  late PatientProfile _selectedPatient;
+class _ProfileSessionsScreenState extends State<ProfileSessionsScreen> {
+  late TherapyProfile _selectedProfile;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedPatient = PatientSessionCatalog.patientExamples.first;
+    _selectedProfile = ProfileSessionCatalog.profileExamples.first;
   }
 
   List<SessionParams> get _templates =>
-      PatientSessionCatalog.buildTemplateSessionsForPatient(_selectedPatient);
+      ProfileSessionCatalog.buildTemplateSessionsForProfile(_selectedProfile);
 
   Future<void> _saveTemplate(
     SessionParams template, {
@@ -41,7 +41,7 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
     setState(() => _saving = true);
     try {
       final SessionParams itemToSave = template.copyWith(
-        id: _savedId(template.title, _selectedPatient.id),
+        id: _savedId(template.title, _selectedProfile.id),
         frequencyHz: frequencyHz,
         amplitude: amplitude,
         createdAtIso: DateTime.now().toIso8601String(),
@@ -69,7 +69,7 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
   }
 
   Future<void> _runBatch() async {
-    final bool completedAll = await widget.runtime.runPatientSessionBatch(
+    final bool completedAll = await widget.runtime.runProfileSessionBatch(
       _templates,
     );
     if (!mounted) return;
@@ -77,7 +77,7 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
       SnackBar(
         content: Text(
           completedAll
-              ? 'Completed ${_templates.length} sessions for ${_selectedPatient.name}'
+              ? 'Completed ${_templates.length} sessions for ${_selectedProfile.name}'
               : 'Session batch ended before completion',
         ),
       ),
@@ -85,7 +85,7 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
   }
 
   Future<void> _runSingle(SessionParams template) async {
-    final bool completed = await widget.runtime.runPatientSession(template);
+    final bool completed = await widget.runtime.runProfileSession(template);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -108,7 +108,7 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
   @override
   Widget build(BuildContext context) {
     final Listenable rebuildSessionState = Listenable.merge(<Listenable>[
-      widget.runtime.patientSessionRunning,
+      widget.runtime.profileSessionRunning,
       widget.runtime.activeSession,
       widget.runtime.frequency,
       widget.runtime.amplitude,
@@ -118,7 +118,7 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
       child: AnimatedBuilder(
         animation: rebuildSessionState,
         builder: (BuildContext context, Widget? child) {
-          final bool anyRunning = widget.runtime.patientSessionRunning.value;
+          final bool anyRunning = widget.runtime.profileSessionRunning.value;
           final SessionRunSnapshot? active = widget.runtime.activeSession.value;
           final bool hasEngine = widget.runtime.hasEngine;
           final List<SessionParams> templates = _templates;
@@ -135,7 +135,7 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          'Patient session planning',
+                          'Profile session planning',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
@@ -143,30 +143,30 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
                           'Only the active session shows running status, countdown, and live values.',
                         ),
                         const SizedBox(height: 12),
-                        DropdownButtonFormField<PatientProfile>(
-                          initialValue: _selectedPatient,
+                        DropdownButtonFormField<TherapyProfile>(
+                          initialValue: _selectedProfile,
                           decoration: const InputDecoration(
-                            labelText: 'Patient example',
+                            labelText: 'Profile example',
                             border: OutlineInputBorder(),
                           ),
-                          items: PatientSessionCatalog.patientExamples.map((
-                            PatientProfile patient,
+                          items: ProfileSessionCatalog.profileExamples.map((
+                            TherapyProfile profile,
                           ) {
-                            return DropdownMenuItem<PatientProfile>(
-                              value: patient,
-                              child: Text(patient.name),
+                            return DropdownMenuItem<TherapyProfile>(
+                              value: profile,
+                              child: Text(profile.name),
                             );
                           }).toList(),
                           onChanged: anyRunning
                               ? null
-                              : (PatientProfile? value) {
+                              : (TherapyProfile? value) {
                                   if (value == null) return;
-                                  setState(() => _selectedPatient = value);
+                                  setState(() => _selectedProfile = value);
                                 },
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _selectedPatient.conditionSummary,
+                          _selectedProfile.conditionSummary,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 12),
@@ -251,9 +251,9 @@ class _PatientSessionsScreenState extends State<PatientSessionsScreen> {
     );
   }
 
-  String _savedId(String title, String patientId) {
+  String _savedId(String title, String profileId) {
     final String normalizedTitle = title.toLowerCase().replaceAll(' ', '-');
-    return 'saved-$patientId-$normalizedTitle-${DateTime.now().microsecondsSinceEpoch}';
+    return 'saved-$profileId-$normalizedTitle-${DateTime.now().microsecondsSinceEpoch}';
   }
 }
 

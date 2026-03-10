@@ -1,7 +1,7 @@
 import '../models/session_params.dart';
 
-class PatientProfile {
-  const PatientProfile({
+class TherapyProfile {
+  const TherapyProfile({
     required this.id,
     required this.name,
     required this.conditionSummary,
@@ -10,6 +10,50 @@ class PatientProfile {
   final String id;
   final String name;
   final String conditionSummary;
+}
+
+class TherapyProfilePreset {
+  const TherapyProfilePreset({
+    required this.name,
+    required this.description,
+    this.subthreshold = false,
+    this.rmp = false,
+    this.pip = false,
+    this.sidebands = false,
+    this.binaural = false,
+  });
+
+  final String name;
+  final String description;
+  final bool subthreshold;
+  final bool rmp;
+  final bool pip;
+  final bool sidebands;
+  final bool binaural;
+  
+  static const List<TherapyProfilePreset> presets = [
+    TherapyProfilePreset(
+      name: 'Basic', 
+      description: 'Uses only basic sub-threshold noise to gently stimulate the auditory system.',
+      subthreshold: true
+    ),
+    TherapyProfilePreset(
+      name: 'Standard', 
+      description: 'Includes sub-threshold noise along with Random Modulation Piping (RMP) and Periodic Integration Pulses (PIP) for engaged therapy.',
+      subthreshold: true, 
+      rmp: true, 
+      pip: true
+    ),
+    TherapyProfilePreset(
+      name: 'Premium', 
+      description: 'Full featured. Adds sideband harmonics and binaural beats for deep habituation therapy.',
+      subthreshold: true, 
+      rmp: true, 
+      pip: true, 
+      sidebands: true, 
+      binaural: true
+    ),
+  ];
 }
 
 class SessionTemplate {
@@ -28,40 +72,40 @@ class SessionTemplate {
   final String notes;
 }
 
-/// Provides reusable patient examples and template sessions.
+/// Provides reusable profile examples and template sessions.
 ///
-/// - 6 patient examples
+/// - 6 profile examples
 /// - 10 session templates (minimum requested)
-class PatientSessionCatalog {
-  static const List<PatientProfile> patientExamples = <PatientProfile>[
-    PatientProfile(
+class ProfileSessionCatalog {
+  static const List<TherapyProfile> profileExamples = <TherapyProfile>[
+    TherapyProfile(
       id: 'pt-001',
-      name: 'Patient Alpha',
+      name: 'Profile Alpha',
       conditionSummary: 'Left-side tonal tinnitus',
     ),
-    PatientProfile(
+    TherapyProfile(
       id: 'pt-002',
-      name: 'Patient Bravo',
+      name: 'Profile Bravo',
       conditionSummary: 'Broadband high-frequency tinnitus',
     ),
-    PatientProfile(
+    TherapyProfile(
       id: 'pt-003',
-      name: 'Patient Charlie',
+      name: 'Profile Charlie',
       conditionSummary: 'Intermittent medium-frequency tinnitus',
     ),
-    PatientProfile(
+    TherapyProfile(
       id: 'pt-004',
-      name: 'Patient Delta',
+      name: 'Profile Delta',
       conditionSummary: 'Bilateral ringing with stress trigger',
     ),
-    PatientProfile(
+    TherapyProfile(
       id: 'pt-005',
-      name: 'Patient Echo',
+      name: 'Profile Echo',
       conditionSummary: 'Stable narrow-band tinnitus',
     ),
-    PatientProfile(
+    TherapyProfile(
       id: 'pt-006',
-      name: 'Patient Foxtrot',
+      name: 'Profile Foxtrot',
       conditionSummary: 'Night-time intensity spike profile',
     ),
   ];
@@ -139,16 +183,16 @@ class PatientSessionCatalog {
     ),
   ];
 
-  static List<SessionParams> buildTemplateSessionsForPatient(
-    PatientProfile patient,
+  static List<SessionParams> buildTemplateSessionsForProfile(
+    TherapyProfile profile,
   ) {
     final createdAt = DateTime.now().toIso8601String();
     return List<SessionParams>.generate(templates.length, (int index) {
       final SessionTemplate template = templates[index];
       return SessionParams(
-        id: _templateId(patient.id, index + 1),
-        patientId: patient.id,
-        patientName: patient.name,
+        id: _templateId(profile.id, index + 1),
+        profileId: profile.id,
+        profileName: profile.name,
         title: template.title,
         frequencyHz: template.frequencyHz,
         amplitude: template.amplitude,
@@ -160,7 +204,7 @@ class PatientSessionCatalog {
     });
   }
 
-  static String _templateId(String patientId, int sessionNo) {
-    return 'template-$patientId-${sessionNo.toString().padLeft(2, '0')}';
+  static String _templateId(String profileId, int sessionNo) {
+    return 'template-$profileId-${sessionNo.toString().padLeft(2, '0')}';
   }
 }

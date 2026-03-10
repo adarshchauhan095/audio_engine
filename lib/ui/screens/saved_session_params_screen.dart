@@ -40,7 +40,7 @@ class _SavedSessionParamsScreenState extends State<SavedSessionParamsScreen> {
   }
 
   Future<void> _runSingle(SessionParams item) async {
-    final bool completed = await widget.runtime.runPatientSession(item);
+    final bool completed = await widget.runtime.runProfileSession(item);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -63,7 +63,7 @@ class _SavedSessionParamsScreenState extends State<SavedSessionParamsScreen> {
   @override
   Widget build(BuildContext context) {
     final Listenable rebuildSessionState = Listenable.merge(<Listenable>[
-      widget.runtime.patientSessionRunning,
+      widget.runtime.profileSessionRunning,
       widget.runtime.activeSession,
       widget.runtime.frequency,
       widget.runtime.amplitude,
@@ -74,7 +74,7 @@ class _SavedSessionParamsScreenState extends State<SavedSessionParamsScreen> {
         animation: rebuildSessionState,
         builder: (BuildContext context, Widget? child) {
           final SessionRunSnapshot? active = widget.runtime.activeSession.value;
-          final bool anyRunning = widget.runtime.patientSessionRunning.value;
+          final bool anyRunning = widget.runtime.profileSessionRunning.value;
           return Column(
             children: <Widget>[
               Padding(
@@ -223,7 +223,7 @@ class _SavedSessionCard extends StatelessWidget {
               ],
             ),
             Text(
-              '${item.patientName} (${item.patientId})',
+              '${item.profileName} (${item.profileId})',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 6),
@@ -323,7 +323,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 12),
             const Text(
               'No saved session parameters yet.\n'
-              'Save from the Patient Sessions screen.',
+              'Save from the Profile Sessions screen.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),

@@ -4,16 +4,24 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:ffi/ffi.dart';
+
 import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
 import '../models/session_params.dart';
 import 'session_controller.dart';
+import 'therapy_session_controller.dart';
+
+void _logNativeMessage(Pointer<Utf8> msg) {
+  final str = msg.toDartString();
+  print('NativeEngine: $str');
+}
 
 class SessionRunSnapshot {
   const SessionRunSnapshot({
     required this.sessionId,
-    required this.patientId,
-    required this.patientName,
+    required this.profileId,
+    required this.profileName,
     required this.title,
     required this.frequencyHz,
     required this.amplitude,
@@ -28,8 +36,8 @@ class SessionRunSnapshot {
   });
 
   final String sessionId;
-  final String patientId;
-  final String patientName;
+  final String profileId;
+  final String profileName;
   final String title;
   final double frequencyHz;
   final double amplitude;
@@ -54,21 +62,28 @@ class AudioRuntimeController {
 
   AudioEngine? _engine;
   SessionController? _sessionController;
+  TherapySessionController? _therapySessionController;
+  NativeCallable<LogCallbackC>? _logCallable;
+
+  final ValueNotifier<bool> _hasEngineNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> stereoEnabled = ValueNotifier<bool>(true);
 
   final ValueNotifier<bool> playing = ValueNotifier<bool>(false);
   final ValueNotifier<double> frequency = ValueNotifier<double>(440.0);
   final ValueNotifier<double> amplitude = ValueNotifier<double>(0.3);
   final ValueNotifier<String?> error = ValueNotifier<String?>(null);
   final ValueNotifier<bool> debugActionRunning = ValueNotifier<bool>(false);
-  final ValueNotifier<bool> patientSessionRunning = ValueNotifier<bool>(false);
+  final ValueNotifier<double> debugProgress = ValueNotifier<double>(0.0);
+  final ValueNotifier<bool> profileSessionRunning = ValueNotifier<bool>(false);
   final ValueNotifier<SessionRunSnapshot?> activeSession =
       ValueNotifier<SessionRunSnapshot?>(null);
 
-  static const double freqMin = 110.0;
-  static const double freqMax = 880.0;
+  static const double freqMin = 20.0;
+  static const double freqMax = 20000.0;
   static const Duration _sessionTickInterval = Duration(milliseconds: 200);
 
   AudioEngine? get engine => _engine;
+  TherapySessionController? get therapySession => _therapySessionController;
   bool get hasEngine => _engine != null;
   bool get hasActiveSession => activeSession.value != null;
 
@@ -88,6 +103,7 @@ class AudioRuntimeController {
       _engine = AudioEngine(bindings)..init();
       _engine!.setFrequency(frequency.value);
       _engine!.setAmplitude(amplitude.value);
+      _engine!.setStereoEnabled(stereoEnabled.value); // Initialize stereo state
       _sessionController = SessionController(
         engine: _engine!,
         onFrequencyChanged: (double frequencyHz) {
@@ -99,21 +115,43 @@ class AudioRuntimeController {
         onPlayingChanged: (bool isPlaying) {
           playing.value = isPlaying;
         },
+        onProgress: (double p) {
+          debugProgress.value = p;
+        },
       );
+      
+      _therapySessionController = TherapySessionController(_engine!);
+      
+      _logCallable = NativeCallable<LogCallbackC>.listener(_logNativeMessage);
+      _engine!.registerLogCallback(_logCallable!.nativeFunction);
     } catch (e) {
       error.value = 'Engine init failed: $e';
     }
   }
 
+  void _setEnginePlaying(bool isPlaying) {
+    if (_engine == null) return;
+    if (isPlaying) {
+      _engine!.start();
+    } else {
+      _engine!.stop();
+    }
+    playing.value = isPlaying;
+  }
+
   void togglePlay() {
     if (_engine == null) return;
     if (playing.value) {
-      _engine!.stop();
-      playing.value = false;
+      _setEnginePlaying(false);
     } else {
-      _engine!.start();
-      playing.value = true;
-    }
+    // Start engine playback
+    _setEnginePlaying(true);
+  }
+  }
+
+  void setStereoEnabled(bool enabled) {
+    stereoEnabled.value = enabled;
+    _engine?.setStereoEnabled(enabled);
   }
 
   void stopPlayback() {
@@ -147,7 +185,7 @@ class AudioRuntimeController {
   }
 
   void endRunningSession() {
-    if (!patientSessionRunning.value) return;
+    if (!profileSessionRunning.value) return;
     _sessionCancelRequested = true;
     _stopSessionTicker();
     activeSession.value = null;
@@ -157,14 +195,14 @@ class AudioRuntimeController {
     }
   }
 
-  Future<bool> runPatientSession(
+  Future<bool> runProfileSession(
     SessionParams params, {
     bool stopWhenDone = true,
   }) async {
     if (_engine == null || _disposed) return false;
-    if (debugActionRunning.value || patientSessionRunning.value) return false;
+    if (debugActionRunning.value || profileSessionRunning.value) return false;
 
-    patientSessionRunning.value = true;
+    profileSessionRunning.value = true;
     _sessionCancelRequested = false;
     try {
       return _runSingleSessionInternal(
@@ -175,16 +213,16 @@ class AudioRuntimeController {
       _sessionCancelRequested = false;
       _stopSessionTicker();
       activeSession.value = null;
-      patientSessionRunning.value = false;
+      profileSessionRunning.value = false;
     }
   }
 
-  Future<bool> runPatientSessionBatch(List<SessionParams> sessions) async {
+  Future<bool> runProfileSessionBatch(List<SessionParams> sessions) async {
     if (_engine == null || _disposed) return false;
     if (sessions.isEmpty) return false;
-    if (debugActionRunning.value || patientSessionRunning.value) return false;
+    if (debugActionRunning.value || profileSessionRunning.value) return false;
 
-    patientSessionRunning.value = true;
+    profileSessionRunning.value = true;
     _sessionCancelRequested = false;
     bool completedAll = true;
     try {
@@ -213,17 +251,20 @@ class AudioRuntimeController {
       _sessionCancelRequested = false;
       _stopSessionTicker();
       activeSession.value = null;
-      patientSessionRunning.value = false;
+      profileSessionRunning.value = false;
     }
   }
 
   Future<void> runExclusiveDebugAction(Future<void> Function() action) async {
-    if (debugActionRunning.value || patientSessionRunning.value) return;
+    if (debugActionRunning.value || profileSessionRunning.value) return;
     debugActionRunning.value = true;
+    debugProgress.value = 0.0;
     try {
       await action();
     } finally {
       debugActionRunning.value = false;
+      debugProgress.value = 0.0;
+      stopPlayback(); // Auto stop when debug test completes
     }
   }
 
@@ -235,22 +276,29 @@ class AudioRuntimeController {
     }
     const Duration duration = Duration(milliseconds: 2000);
     const Duration interval = Duration(milliseconds: 50);
-    final DateTime end = DateTime.now().add(duration);
+    final DateTime start = DateTime.now();
+    final DateTime end = start.add(duration);
     while (DateTime.now().isBefore(end)) {
+      final now = DateTime.now();
+      debugProgress.value = (now.difference(start).inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+      
       final double f =
-          110.0 + (8000 - 110) * (DateTime.now().millisecond % 1000 / 1000);
-      final double a = (DateTime.now().millisecond % 1000) / 1000.0;
+          110.0 + (8000 - 110) * (now.millisecond % 1000 / 1000);
+      final double a = (now.millisecond % 1000) / 1000.0;
       _engine!.setFrequency(f);
       _engine!.setAmplitude(a);
       frequency.value = f.clamp(freqMin, freqMax);
       amplitude.value = a.clamp(0.0, 1.0);
       await Future<void>.delayed(interval);
     }
+    debugProgress.value = 1.0;
   }
 
   Future<void> runStartStop10() async {
     if (_engine == null) return;
-    for (int i = 0; i < 10; i++) {
+    const int iterations = 10;
+    for (int i = 0; i < iterations; i++) {
+      debugProgress.value = i / iterations;
       _engine!.start();
       playing.value = true;
       await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -258,6 +306,7 @@ class AudioRuntimeController {
       playing.value = false;
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
+    debugProgress.value = 1.0;
   }
 
   void runExtremeValues() {
@@ -268,6 +317,7 @@ class AudioRuntimeController {
     _engine!.setAmplitude(1);
     frequency.value = freqMax;
     amplitude.value = 1;
+    debugProgress.value = 1.0;
   }
 
   Future<void> runSequenceTest() async {
@@ -287,9 +337,11 @@ class AudioRuntimeController {
 
   void dispose() {
     _disposed = true;
+    _logCallable?.close();
     endRunningSession();
     _stopSessionTicker();
     _sessionController?.dispose();
+    _therapySessionController?.dispose();
     _engine?.dispose();
     _engine = null;
 
@@ -298,7 +350,8 @@ class AudioRuntimeController {
     amplitude.dispose();
     error.dispose();
     debugActionRunning.dispose();
-    patientSessionRunning.dispose();
+    debugProgress.dispose();
+    profileSessionRunning.dispose();
     activeSession.dispose();
   }
 
@@ -395,8 +448,8 @@ class AudioRuntimeController {
 
     activeSession.value = SessionRunSnapshot(
       sessionId: session.id,
-      patientId: session.patientId,
-      patientName: session.patientName,
+      profileId: session.profileId,
+      profileName: session.profileName,
       title: session.title,
       frequencyHz: frequency.value,
       amplitude: amplitude.value,

@@ -9,8 +9,9 @@ class DebugTestsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: ValueListenableBuilder<bool>(
+    return Scaffold(
+      appBar: AppBar(title: const Text('Debug Tests')),
+      body: ValueListenableBuilder<bool>(
         valueListenable: runtime.debugActionRunning,
         builder: (BuildContext context, bool isDebugRunning, Widget? child) {
           final bool disabled = !runtime.hasEngine || isDebugRunning;
@@ -125,7 +126,64 @@ class DebugTestsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (isDebugRunning) const LinearProgressIndicator(minHeight: 3),
+                if (isDebugRunning) 
+                  ValueListenableBuilder<double>(
+                    valueListenable: runtime.debugProgress,
+                    builder: (context, progress, _) => LinearProgressIndicator(value: progress, minHeight: 6),
+                  ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Audio Controls',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        ValueListenableBuilder<double>(
+                          valueListenable: runtime.frequency,
+                          builder: (context, freq, _) {
+                            final double secureFreq = freq.clamp(AudioRuntimeController.freqMin, AudioRuntimeController.freqMax);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text('Frequency: ${secureFreq.toStringAsFixed(1)} Hz'),
+                                Slider(
+                                  value: secureFreq,
+                                  min: AudioRuntimeController.freqMin,
+                                  max: AudioRuntimeController.freqMax,
+                                  onChanged: disabled ? null : (double value) => runtime.setFrequency(value),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        ValueListenableBuilder<double>(
+                          valueListenable: runtime.amplitude,
+                          builder: (context, amp, _) {
+                            final double secureAmp = amp.clamp(0.0, 1.0);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text('Amplitude: ${secureAmp.toStringAsFixed(3)}'),
+                                Slider(
+                                  value: secureAmp,
+                                  min: 0.0,
+                                  max: 1.0,
+                                  onChanged: disabled ? null : (double value) => runtime.setAmplitude(value),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 88),
               ],
             ),

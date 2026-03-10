@@ -16,6 +16,12 @@ add_library(native_audio SHARED
   engine/ParameterSmoother.cpp # Smooth parameter transitions to prevent clicks.
   engine/Oscillator.cpp   # Implements the audio oscillator for generating tones.
   engine/VoiceManager.cpp # Voice container for optional multi-oscillator rendering.
+  engine/TherapyRouter.cpp
+  engine/modules/SubthresholdModule.cpp
+  engine/modules/RMPModule.cpp
+  engine/modules/PIPModule.cpp
+  engine/modules/SidebandModule.cpp
+  engine/modules/BinauralModule.cpp
 )
 
 # Specifies private include directories for the 'native_audio' library.

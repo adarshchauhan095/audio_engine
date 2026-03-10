@@ -4,6 +4,7 @@
 /// session logic testable without native FFI.
 abstract class AudioControl {
   bool start();
+  void stop();
   bool get isRunning;
   void setFrequency(double hz);
   void setAmplitude(double amp);

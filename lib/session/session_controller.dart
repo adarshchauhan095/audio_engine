@@ -12,6 +12,7 @@ class SessionController {
     required void Function(double frequencyHz) onFrequencyChanged,
     required void Function(double amplitude) onAmplitudeChanged,
     required void Function(bool playing) onPlayingChanged,
+    void Function(double progress)? onProgress,
     List<double> sequenceHz = _defaultSequenceHz,
     Duration sequenceStepDelay = const Duration(milliseconds: 300),
     int adaptiveSteps = 60,
@@ -22,6 +23,7 @@ class SessionController {
        _onFrequencyChanged = onFrequencyChanged,
        _onAmplitudeChanged = onAmplitudeChanged,
        _onPlayingChanged = onPlayingChanged,
+       _onProgress = onProgress,
        _sequenceHz = List<double>.from(sequenceHz),
        _sequenceStepDelay = sequenceStepDelay,
        _adaptiveSteps = adaptiveSteps,
@@ -54,6 +56,7 @@ class SessionController {
   final void Function(double frequencyHz) _onFrequencyChanged;
   final void Function(double amplitude) _onAmplitudeChanged;
   final void Function(bool playing) _onPlayingChanged;
+  final void Function(double progress)? _onProgress;
 
   final List<double> _sequenceHz;
   final Duration _sequenceStepDelay;
@@ -72,14 +75,19 @@ class SessionController {
     _testInProgress = true;
     try {
       _ensurePlaying();
-      for (final hz in _sequenceHz) {
+      for (int i = 0; i < _sequenceHz.length; i++) {
+        final hz = _sequenceHz[i];
         if (_disposed) break;
+        _onProgress?.call(i / _sequenceHz.length);
         _engine.setFrequency(hz);
         _onFrequencyChanged(hz);
         await Future<void>.delayed(_sequenceStepDelay);
       }
+      _onProgress?.call(1.0);
     } finally {
       _testInProgress = false;
+      _engine.stop();
+      _onPlayingChanged(false);
     }
   }
 
@@ -91,6 +99,7 @@ class SessionController {
       for (int i = 0; i < _adaptiveSteps; i++) {
         if (_disposed) break;
         final t = i / (_adaptiveSteps - 1);
+        _onProgress?.call(t);
         final hz = 220.0 + 440.0 * (0.5 + 0.5 * math.sin(t * math.pi * 4.0));
         final amp = 0.2 + 0.5 * (0.5 + 0.5 * math.cos(t * math.pi * 2.0));
         _engine.setFrequency(hz);
@@ -99,8 +108,11 @@ class SessionController {
         _onAmplitudeChanged(amp);
         await Future<void>.delayed(_adaptiveStepDelay);
       }
+      _onProgress?.call(1.0);
     } finally {
       _testInProgress = false;
+      _engine.stop();
+      _onPlayingChanged(false);
     }
   }
 
@@ -112,6 +124,7 @@ class SessionController {
       for (int i = 0; i < _longRunSteps; i++) {
         if (_disposed) break;
         final t = i / (_longRunSteps - 1);
+        _onProgress?.call(t);
         final hz = 180.0 + 600.0 * t;
         final amp = 0.25 + 0.25 * (0.5 + 0.5 * math.sin(t * math.pi * 8.0));
         _engine.setFrequency(hz);
@@ -120,8 +133,11 @@ class SessionController {
         _onAmplitudeChanged(amp);
         await Future<void>.delayed(_longRunStepDelay);
       }
+      _onProgress?.call(1.0);
     } finally {
       _testInProgress = false;
+      _engine.stop();
+      _onPlayingChanged(false);
     }
   }
 

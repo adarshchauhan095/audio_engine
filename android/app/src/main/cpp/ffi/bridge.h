@@ -64,6 +64,22 @@ void audio_start_session(NativeAudioHandle handle);
 /// @param handle A handle to the native audio engine instance.
 void audio_stop_session(NativeAudioHandle handle);
 
+typedef void (*AudioLogCallback)(const char* msg);
+
+void audio_therapy_start(NativeAudioHandle handle, 
+    int subthreshold, int rmp, int pip, int sidebands, int binaural, 
+    float intensity, float baseFreq, float baseAmp);
+
+void audio_therapy_update(NativeAudioHandle handle, 
+    int subthreshold, int rmp, int pip, int sidebands, int binaural, 
+    float intensity, float baseFreq, float baseAmp);
+
+void audio_therapy_stop(NativeAudioHandle handle);
+
+void audio_set_stereo_enabled(NativeAudioHandle handle, int enabled);
+
+void audio_register_log_callback(NativeAudioHandle handle, AudioLogCallback cb);
+
 /// Closes the extern "C" block.
 #ifdef __cplusplus
 }

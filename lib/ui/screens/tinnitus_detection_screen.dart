@@ -10,8 +10,9 @@ class TinnitusDetectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
+    return Scaffold(
+      appBar: AppBar(title: const Text('Tinnitus Detection')),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -31,6 +32,16 @@ class TinnitusDetectionScreen extends StatelessWidget {
             const SizedBox(height: 88),
           ],
         ),
+      ),
+      floatingActionButton: ValueListenableBuilder<bool>(
+        valueListenable: runtime.playing,
+        builder: (context, isPlaying, _) {
+          return FloatingActionButton.extended(
+            onPressed: runtime.togglePlay,
+            icon: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
+            label: Text(isPlaying ? 'Stop' : 'Play'),
+          );
+        },
       ),
     );
   }

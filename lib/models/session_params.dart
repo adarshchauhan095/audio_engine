@@ -1,13 +1,13 @@
 import '../storage/detected_frequency_storage.dart';
 
-/// API-ready patient session configuration model.
+/// API-ready profile session configuration model.
 ///
 /// Can be serialized directly for local persistence or future backend APIs.
 class SessionParams {
   const SessionParams({
     required this.id,
-    required this.patientId,
-    required this.patientName,
+    required this.profileId,
+    required this.profileName,
     required this.title,
     required this.frequencyHz,
     required this.amplitude,
@@ -18,8 +18,8 @@ class SessionParams {
   });
 
   final String id;
-  final String patientId;
-  final String patientName;
+  final String profileId;
+  final String profileName;
   final String title;
   final double frequencyHz;
   final double amplitude;
@@ -30,8 +30,8 @@ class SessionParams {
 
   SessionParams copyWith({
     String? id,
-    String? patientId,
-    String? patientName,
+    String? profileId,
+    String? profileName,
     String? title,
     double? frequencyHz,
     double? amplitude,
@@ -42,8 +42,8 @@ class SessionParams {
   }) {
     return SessionParams(
       id: id ?? this.id,
-      patientId: patientId ?? this.patientId,
-      patientName: patientName ?? this.patientName,
+      profileId: profileId ?? this.profileId,
+      profileName: profileName ?? this.profileName,
       title: title ?? this.title,
       frequencyHz: frequencyHz ?? this.frequencyHz,
       amplitude: amplitude ?? this.amplitude,
@@ -65,8 +65,8 @@ class SessionParams {
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'id': id,
-      'patientId': patientId,
-      'patientName': patientName,
+      'profileId': profileId,
+      'profileName': profileName,
       'title': title,
       'frequencyHz': _clampFrequency(frequencyHz),
       'amplitude': _clampAmplitude(amplitude),
@@ -80,8 +80,8 @@ class SessionParams {
   static SessionParams fromJson(Map<String, dynamic> json) {
     return SessionParams(
       id: (json['id'] ?? '').toString(),
-      patientId: (json['patientId'] ?? '').toString(),
-      patientName: (json['patientName'] ?? '').toString(),
+      profileId: (json['profileId'] ?? '').toString(),
+      profileName: (json['profileName'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
       frequencyHz: _toDouble(json['frequencyHz'], 440.0),
       amplitude: _toDouble(json['amplitude'], 0.3),

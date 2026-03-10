@@ -1,4 +1,5 @@
 #include "AudioEngine.h"
+#include "TherapyConfig.h"
 
 #include <algorithm>
 
@@ -30,7 +31,7 @@ bool AudioEngine::start() {
       ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
       ->setSharingMode(oboe::SharingMode::Exclusive)
       ->setFormat(oboe::AudioFormat::Float)
-      ->setChannelCount(1)
+      ->setChannelCount(2)
       ->setSampleRate(48000)
       ->setDataCallback(this);
 
@@ -73,10 +74,12 @@ bool AudioEngine::isRunning() const {
 }
 
 void AudioEngine::setFrequency(float hz) {
+  currentFreq_.store(hz, std::memory_order_relaxed);
   voiceManager_.setFrequency(hz);
 }
 
 void AudioEngine::setTargetFrequency(double hz) {
+  currentFreq_.store(hz, std::memory_order_relaxed);
   voiceManager_.setTargetFrequency(hz);
 }
 
@@ -98,15 +101,63 @@ void AudioEngine::stopSession() {
   eventScheduler_.stopSession();
 }
 
+void AudioEngine::setStereoEnabled(bool enabled) {
+  stereoEnabled_.store(enabled, std::memory_order_relaxed);
+}
+
+void AudioEngine::therapyStart(const TherapyConfig& config) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!stream_) {
+        // init therapy router if needed
+        therapyRouter_.init(48000.0);
+    } else {
+        therapyRouter_.init(stream_->getSampleRate());
+    }
+    therapyRouter_.updateConfig(config);
+    log("Therapy started");
+}
+
+void AudioEngine::therapyUpdate(const TherapyConfig& config) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    therapyRouter_.updateConfig(config);
+    log("Therapy updated");
+}
+
+void AudioEngine::therapyStop() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    TherapyConfig emptyConfig;
+    therapyRouter_.updateConfig(emptyConfig);
+    log("Therapy stopped");
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(
     oboe::AudioStream*,
     void* audioData,
     int32_t numFrames) {
   float* out = static_cast<float*>(audioData);
+  double freq = currentFreq_.load(std::memory_order_relaxed);
+  bool isStereo = stereoEnabled_.load(std::memory_order_relaxed);
+  
   for (int32_t i = 0; i < numFrames; ++i) {
     const float transport = transportSmoother_.process();
     const float amp = amplitudeSmoother_.process();
-    out[i] = transport * amp * voiceManager_.process();
+    
+    if (therapyRouter_.isActive()) {
+        StereoSample sr = therapyRouter_.process(freq, amp);
+        if (!isStereo) {
+            float mono = (sr.left + sr.right) * 0.5f;
+            sr.left = mono;
+            sr.right = mono;
+        }
+        out[i * 2]     = sr.left * transport;
+        out[i * 2 + 1] = sr.right * transport;
+        // Keep voice manager processing silent to avoid it falling behind
+        voiceManager_.process();
+    } else {
+        float mono = transport * amp * voiceManager_.process();
+        out[i * 2]     = mono;
+        out[i * 2 + 1] = mono;
+    }
   }
   return oboe::DataCallbackResult::Continue;
 }
