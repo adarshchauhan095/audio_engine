@@ -11,7 +11,7 @@ The application is specifically designed to provide structured therapy for tinni
 3. [Important vs Non-Important](#important-vs-non-important)
 4. [Current App Flow](#current-app-flow)
 5. [How Components Are Interconnected](#how-components-are-interconnected)
-6. [Key Packages and Responsibilities](#key-packages-and-responsibilities)
+6. [Key Packages and Documentation](#key-packages-and-documentation)
 
 ---
 
@@ -124,10 +124,15 @@ VoiceManager / ParameterSmoother (Mixing and smoothing transitions)
 Oboe (Hardware render thread outputting the final StereoSample to the Android device)
 ```
 
-## Key Packages and Responsibilities
+## Key Packages and Documentation
 
 - **`lib/session/audio_runtime_controller.dart`:** The nerve center. Owns the Flutter Engine instance bindings and global state (frequency, amplitude, play state).
 - **`lib/session/therapy_session_controller.dart`:** The Adaptive Parameter Engine. Orchestrates the timing, math for Warm-up/Cooldown ramps, and module active states.
 - **`lib/engine/bindings.dart`:** Maps Dart data types directly to C memory limits.
 - **`android/app/src/main/cpp/engine/TherapyRouter.cpp`:** The C++ heart of Milestone 4. Routes the base sine wave through the array of enabled neuroacoustic modifiers before final mixing.
 - **`lib/ui/tinnitus_detection_section.dart`:** Implements the intricate logic for sweep/hold timers required for precision clinical frequency matching.
+
+### Documentation references
+For further reading on the logic implemented:
+- **DSP Modules:** Custom modifications utilizing the standard `<random>` and `<atomic>` C++ headers, implemented inside `android/app/src/main/cpp/engine/modules`.
+- **UI Architecture:** Built entirely utilizing Flutter's `ValueNotifier` system instead of heavy state management frameworks to keep audio pipeline fast.
