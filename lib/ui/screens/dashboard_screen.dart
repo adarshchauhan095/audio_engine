@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../session/audio_runtime_controller.dart';
 import 'audio_control_screen.dart';
 import 'debug_tests_screen.dart';
+import 'module_demo_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'therapy_session_screen.dart';
@@ -82,6 +83,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Debug Tests',
                 icon: Icons.bug_report,
                 onTap: () => _pushScreen(context, DebugTestsScreen(runtime: _runtime)),
+              ),
+              _ModuleCard(
+                title: 'Module Demo',
+                icon: Icons.science,
+                onTap: () => _pushScreen(context, ModuleDemoScreen(runtime: _runtime)),
               ),
               _ModuleCard(
                 title: 'Settings',
