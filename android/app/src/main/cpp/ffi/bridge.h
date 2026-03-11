@@ -69,21 +69,21 @@ void audio_stop_session(NativeAudioHandle handle);
 
 typedef void (*AudioLogCallback)(const char *msg);
 
-void audio_therapy_start(NativeAudioHandle handle, int subthreshold, int rmp,
+int audio_therapy_start(NativeAudioHandle handle, int subthreshold, int rmp,
+                        int pip, int sidebands, int binaural, float intensity,
+                        float baseFreq, float baseAmp, float rmpDepth,
+                        float rmpRate, float pipInterval, float pipDuration,
+                        float sidebandOffset, float sidebandIntensity,
+                        float binauralOffset);
+
+int audio_therapy_update(NativeAudioHandle handle, int subthreshold, int rmp,
                          int pip, int sidebands, int binaural, float intensity,
                          float baseFreq, float baseAmp, float rmpDepth,
                          float rmpRate, float pipInterval, float pipDuration,
                          float sidebandOffset, float sidebandIntensity,
                          float binauralOffset);
 
-void audio_therapy_update(NativeAudioHandle handle, int subthreshold, int rmp,
-                          int pip, int sidebands, int binaural, float intensity,
-                          float baseFreq, float baseAmp, float rmpDepth,
-                          float rmpRate, float pipInterval, float pipDuration,
-                          float sidebandOffset, float sidebandIntensity,
-                          float binauralOffset);
-
-void audio_therapy_stop(NativeAudioHandle handle);
+int audio_therapy_stop(NativeAudioHandle handle);
 
 void audio_set_stereo_enabled(NativeAudioHandle handle, int enabled);
 

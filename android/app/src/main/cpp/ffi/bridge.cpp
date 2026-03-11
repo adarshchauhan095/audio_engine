@@ -110,34 +110,34 @@ static TherapyConfig createConfig(int subthreshold, int rmp, int pip,
   return c;
 }
 
-void audio_therapy_start(NativeAudioHandle h, int subthreshold, int rmp,
+int audio_therapy_start(NativeAudioHandle h, int subthreshold, int rmp, int pip,
+                        int sidebands, int binaural, float intensity,
+                        float baseFreq, float baseAmp, float rmpDepth,
+                        float rmpRate, float pipInterval, float pipDuration,
+                        float sidebandOffset, float sidebandIntensity,
+                        float binauralOffset) {
+
+  return static_cast<AudioEngine *>(h)->therapyStart(createConfig(
+      subthreshold, rmp, pip, sidebands, binaural, intensity, baseFreq, baseAmp,
+      rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset,
+      sidebandIntensity, binauralOffset));
+}
+
+int audio_therapy_update(NativeAudioHandle h, int subthreshold, int rmp,
                          int pip, int sidebands, int binaural, float intensity,
                          float baseFreq, float baseAmp, float rmpDepth,
                          float rmpRate, float pipInterval, float pipDuration,
                          float sidebandOffset, float sidebandIntensity,
                          float binauralOffset) {
 
-  static_cast<AudioEngine *>(h)->therapyStart(createConfig(
+  return static_cast<AudioEngine *>(h)->therapyUpdate(createConfig(
       subthreshold, rmp, pip, sidebands, binaural, intensity, baseFreq, baseAmp,
       rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset,
       sidebandIntensity, binauralOffset));
 }
 
-void audio_therapy_update(NativeAudioHandle h, int subthreshold, int rmp,
-                          int pip, int sidebands, int binaural, float intensity,
-                          float baseFreq, float baseAmp, float rmpDepth,
-                          float rmpRate, float pipInterval, float pipDuration,
-                          float sidebandOffset, float sidebandIntensity,
-                          float binauralOffset) {
-
-  static_cast<AudioEngine *>(h)->therapyUpdate(createConfig(
-      subthreshold, rmp, pip, sidebands, binaural, intensity, baseFreq, baseAmp,
-      rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset,
-      sidebandIntensity, binauralOffset));
-}
-
-void audio_therapy_stop(NativeAudioHandle h) {
-  static_cast<AudioEngine *>(h)->therapyStop();
+int audio_therapy_stop(NativeAudioHandle h) {
+  return static_cast<AudioEngine *>(h)->therapyStop();
 }
 
 void audio_set_stereo_enabled(NativeAudioHandle h, int enabled) {

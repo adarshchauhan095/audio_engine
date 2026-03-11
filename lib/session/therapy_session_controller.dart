@@ -97,7 +97,7 @@ class TherapySessionController {
         engine.start();
       }
       
-      engine.therapyStart(
+      int startResult = engine.therapyStart(
         subthreshold: subthreshold,
         rmp: rmp,
         pip: pip,
@@ -114,6 +114,10 @@ class TherapySessionController {
         sidebandIntensity: 0.0, // starts at 0
         binauralOffset: targetBinauralOffset,
       );
+      
+      if (startResult < 0) {
+        debugPrint('TherapySessionController: engine.therapyStart returned error $startResult');
+      }
       
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(milliseconds: 200), _onTick);
@@ -162,7 +166,7 @@ class TherapySessionController {
      double currentRmpDepth = targetRmpDepth * phaseRatio;
      double currentSidebandIntensity = targetSidebandIntensity * phaseRatio;
      
-     engine.therapyUpdate(
+     int updateResult = engine.therapyUpdate(
         subthreshold: subthreshold,
         rmp: rmp,
         pip: pip,
@@ -179,6 +183,10 @@ class TherapySessionController {
         sidebandIntensity: currentSidebandIntensity,
         binauralOffset: targetBinauralOffset,
       );
+      
+      if (updateResult < 0) {
+        debugPrint('TherapySessionController: engine.therapyUpdate returned error $updateResult');
+      }
   }
   
   void stopSession() {
@@ -186,7 +194,10 @@ class TherapySessionController {
      _timer = null;
      isRunning.value = false;
      currentPhase.value = TherapyPhase.idle;
-     engine.therapyStop();
+     int stopResult = engine.therapyStop();
+     if (stopResult < 0) {
+       debugPrint('TherapySessionController: engine.therapyStop returned error $stopResult');
+     }
      // Opt to stop engine as well if Therapy takes full control
      if (engine.isRunning) {
        engine.stop();

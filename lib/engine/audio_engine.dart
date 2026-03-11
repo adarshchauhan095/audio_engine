@@ -83,7 +83,7 @@ class AudioEngine implements AudioControl {
     _bindings.stopSession(_handle!);
   }
 
-  void therapyStart({
+  int therapyStart({
     bool subthreshold = false,
     bool rmp = false,
     bool pip = false,
@@ -100,8 +100,8 @@ class AudioEngine implements AudioControl {
     double sidebandIntensity = 0.33,
     double binauralOffset = 5.0,
   }) {
-    if (_handle == null) return;
-    _bindings.therapyStart(
+    if (_handle == null) return -1;
+    return _bindings.therapyStart(
       _handle!,
       subthreshold ? 1 : 0,
       rmp ? 1 : 0,
@@ -121,7 +121,7 @@ class AudioEngine implements AudioControl {
     );
   }
 
-  void therapyUpdate({
+  int therapyUpdate({
     bool subthreshold = false,
     bool rmp = false,
     bool pip = false,
@@ -138,8 +138,8 @@ class AudioEngine implements AudioControl {
     double sidebandIntensity = 0.33,
     double binauralOffset = 5.0,
   }) {
-    if (_handle == null) return;
-    _bindings.therapyUpdate(
+    if (_handle == null) return -1;
+    return _bindings.therapyUpdate(
       _handle!,
       subthreshold ? 1 : 0,
       rmp ? 1 : 0,
@@ -159,9 +159,9 @@ class AudioEngine implements AudioControl {
     );
   }
 
-  void therapyStop() {
-    if (_handle == null) return;
-    _bindings.therapyStop(_handle!);
+  int therapyStop() {
+    if (_handle == null) return -1;
+    return _bindings.therapyStop(_handle!);
   }
 
   void setStereoEnabled(bool enabled) {

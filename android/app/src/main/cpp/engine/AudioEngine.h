@@ -8,8 +8,8 @@
 
 #include "EventScheduler.h"
 #include "ParameterSmoother.h"
-#include "VoiceManager.h"
 #include "TherapyRouter.h"
+#include "VoiceManager.h"
 
 /// Engine core: Oboe stream + DSP parameter control.
 ///
@@ -34,17 +34,15 @@ public:
   void setStereoEnabled(bool enabled);
 
   // Therapy API
-  void therapyStart(const TherapyConfig& config);
-  void therapyUpdate(const TherapyConfig& config);
-  void therapyStop();
+  int therapyStart(const TherapyConfig &config);
+  int therapyUpdate(const TherapyConfig &config);
+  int therapyStop();
 
-  typedef void (*LogCallback)(const char*);
+  typedef void (*LogCallback)(const char *);
   void setLogCallback(LogCallback cb) { logCb_ = cb; }
 
-  oboe::DataCallbackResult onAudioReady(
-      oboe::AudioStream*,
-      void* audioData,
-      int32_t numFrames) override;
+  oboe::DataCallbackResult onAudioReady(oboe::AudioStream *, void *audioData,
+                                        int32_t numFrames) override;
 
 private:
   std::mutex mutex_;
@@ -61,9 +59,9 @@ private:
   std::atomic<bool> stereoEnabled_{true};
   std::atomic<bool> running_{false};
   LogCallback logCb_ = nullptr;
-  
-  void log(const char* msg) {
-      if (logCb_) logCb_(msg);
+
+  void log(const char *msg) {
+    if (logCb_)
+      logCb_(msg);
   }
 };
-

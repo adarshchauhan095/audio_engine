@@ -25,8 +25,11 @@ typedef _SetFloatDart = void Function(NativeAudioHandle, double);
 typedef _SetDoubleC = Void Function(NativeAudioHandle, Double);
 typedef _SetDoubleDart = void Function(NativeAudioHandle, double);
 
-typedef _TherapyFuncC = Void Function(NativeAudioHandle, Int32, Int32, Int32, Int32, Int32, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float);
-typedef _TherapyFuncDart = void Function(NativeAudioHandle, int, int, int, int, int, double, double, double, double, double, double, double, double, double, double);
+typedef _TherapyFuncC = Int32 Function(NativeAudioHandle, Int32, Int32, Int32, Int32, Int32, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float);
+typedef _TherapyFuncDart = int Function(NativeAudioHandle, int, int, int, int, int, double, double, double, double, double, double, double, double, double, double);
+
+typedef _TherapyStopFuncC = Int32 Function(NativeAudioHandle);
+typedef _TherapyStopFuncDart = int Function(NativeAudioHandle);
 
 typedef LogCallbackC = Void Function(Pointer<Utf8>);
 typedef _RegisterLogC = Void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
@@ -49,7 +52,7 @@ class NativeBindings {
   late final _VoidNativeAudioHandleFuncDart _stopSession;
   late final _TherapyFuncDart _therapyStart;
   late final _TherapyFuncDart _therapyUpdate;
-  late final _VoidNativeAudioHandleFuncDart _therapyStop;
+  late final _TherapyStopFuncDart _therapyStop;
   late final _RegisterLogDart _registerLogCallback;
   late final _SetIntDart _setStereoEnabled;
 
@@ -97,8 +100,8 @@ class NativeBindings {
     _therapyUpdate = lib.lookupFunction<_TherapyFuncC, _TherapyFuncDart>('audio_therapy_update');
     _therapyStop = lib
         .lookupFunction<
-          _VoidNativeAudioHandleFuncC,
-          _VoidNativeAudioHandleFuncDart
+          _TherapyStopFuncC,
+          _TherapyStopFuncDart
         >('audio_therapy_stop');
     _registerLogCallback = lib.lookupFunction<_RegisterLogC, _RegisterLogDart>('audio_register_log_callback');
     _setStereoEnabled = lib.lookupFunction<_SetIntC, _SetIntDart>('audio_set_stereo_enabled');
@@ -119,7 +122,7 @@ class NativeBindings {
   void startSession(NativeAudioHandle handle) => _startSession(handle);
   void stopSession(NativeAudioHandle handle) => _stopSession(handle);
 
-  void therapyStart(
+  int therapyStart(
     NativeAudioHandle handle, 
     int sub, int rmp, int pip, int side, int bin, 
     double intensity, double freq, double amp,
@@ -130,7 +133,7 @@ class NativeBindings {
   ) =>
       _therapyStart(handle, sub, rmp, pip, side, bin, intensity, freq, amp, rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset, sidebandIntensity, binauralOffset);
       
-  void therapyUpdate(
+  int therapyUpdate(
     NativeAudioHandle handle, 
     int sub, int rmp, int pip, int side, int bin, 
     double intensity, double freq, double amp,
@@ -141,7 +144,7 @@ class NativeBindings {
   ) =>
       _therapyUpdate(handle, sub, rmp, pip, side, bin, intensity, freq, amp, rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset, sidebandIntensity, binauralOffset);
       
-  void therapyStop(NativeAudioHandle handle) => _therapyStop(handle);
+  int therapyStop(NativeAudioHandle handle) => _therapyStop(handle);
   
   void setStereoEnabled(NativeAudioHandle handle, int enabled) => _setStereoEnabled(handle, enabled);
   
