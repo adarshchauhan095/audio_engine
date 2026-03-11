@@ -4,11 +4,12 @@
 
 class SidebandModule {
 public:
-    void init(double sampleRate);
-    float process(double baseFreq, float baseAmp);
+  void init(double sampleRate);
+  float process(double baseFreq, float baseAmp, float sidebandOffset,
+                float sidebandIntensity);
 
 private:
-    Oscillator lowerSideband_;
-    Oscillator upperSideband_;
-    Oscillator mainOsc_;
+  Oscillator lowerSideband_;
+  Oscillator upperSideband_;
+  Oscillator mainOsc_;
 };

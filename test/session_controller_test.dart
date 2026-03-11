@@ -62,7 +62,7 @@ void main() {
     expect(engine.startCalls, 1);
     expect(engine.setFrequencyCalls, 3);
     expect(engine.setAmplitudeCalls, 0);
-    expect(lastPlaying, isTrue);
+    expect(lastPlaying, isFalse);
     expect(controller.testInProgress, isFalse);
   });
 

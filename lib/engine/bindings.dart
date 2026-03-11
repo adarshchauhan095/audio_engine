@@ -25,8 +25,8 @@ typedef _SetFloatDart = void Function(NativeAudioHandle, double);
 typedef _SetDoubleC = Void Function(NativeAudioHandle, Double);
 typedef _SetDoubleDart = void Function(NativeAudioHandle, double);
 
-typedef _TherapyFuncC = Void Function(NativeAudioHandle, Int32, Int32, Int32, Int32, Int32, Float, Float, Float);
-typedef _TherapyFuncDart = void Function(NativeAudioHandle, int, int, int, int, int, double, double, double);
+typedef _TherapyFuncC = Void Function(NativeAudioHandle, Int32, Int32, Int32, Int32, Int32, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float);
+typedef _TherapyFuncDart = void Function(NativeAudioHandle, int, int, int, int, int, double, double, double, double, double, double, double, double, double, double);
 
 typedef LogCallbackC = Void Function(Pointer<Utf8>);
 typedef _RegisterLogC = Void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
@@ -119,11 +119,27 @@ class NativeBindings {
   void startSession(NativeAudioHandle handle) => _startSession(handle);
   void stopSession(NativeAudioHandle handle) => _stopSession(handle);
 
-  void therapyStart(NativeAudioHandle handle, int sub, int rmp, int pip, int side, int bin, double intensity, double freq, double amp) =>
-      _therapyStart(handle, sub, rmp, pip, side, bin, intensity, freq, amp);
+  void therapyStart(
+    NativeAudioHandle handle, 
+    int sub, int rmp, int pip, int side, int bin, 
+    double intensity, double freq, double amp,
+    double rmpDepth, double rmpRate,
+    double pipInterval, double pipDuration,
+    double sidebandOffset, double sidebandIntensity,
+    double binauralOffset
+  ) =>
+      _therapyStart(handle, sub, rmp, pip, side, bin, intensity, freq, amp, rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset, sidebandIntensity, binauralOffset);
       
-  void therapyUpdate(NativeAudioHandle handle, int sub, int rmp, int pip, int side, int bin, double intensity, double freq, double amp) =>
-      _therapyUpdate(handle, sub, rmp, pip, side, bin, intensity, freq, amp);
+  void therapyUpdate(
+    NativeAudioHandle handle, 
+    int sub, int rmp, int pip, int side, int bin, 
+    double intensity, double freq, double amp,
+    double rmpDepth, double rmpRate,
+    double pipInterval, double pipDuration,
+    double sidebandOffset, double sidebandIntensity,
+    double binauralOffset
+  ) =>
+      _therapyUpdate(handle, sub, rmp, pip, side, bin, intensity, freq, amp, rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset, sidebandIntensity, binauralOffset);
       
   void therapyStop(NativeAudioHandle handle) => _therapyStop(handle);
   

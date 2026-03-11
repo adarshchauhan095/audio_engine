@@ -92,6 +92,13 @@ class AudioEngine implements AudioControl {
     double intensity = 0.5,
     double baseFreq = 6200.0,
     double baseAmp = 0.2,
+    double rmpDepth = 0.1,
+    double rmpRate = 5.0,
+    double pipInterval = 0.2,
+    double pipDuration = 0.02,
+    double sidebandOffset = 100.0,
+    double sidebandIntensity = 0.33,
+    double binauralOffset = 5.0,
   }) {
     if (_handle == null) return;
     _bindings.therapyStart(
@@ -104,6 +111,13 @@ class AudioEngine implements AudioControl {
       intensity,
       baseFreq,
       baseAmp,
+      rmpDepth,
+      rmpRate,
+      pipInterval,
+      pipDuration,
+      sidebandOffset,
+      sidebandIntensity,
+      binauralOffset,
     );
   }
 
@@ -116,6 +130,13 @@ class AudioEngine implements AudioControl {
     double intensity = 0.5,
     double baseFreq = 6200.0,
     double baseAmp = 0.2,
+    double rmpDepth = 0.1,
+    double rmpRate = 5.0,
+    double pipInterval = 0.2,
+    double pipDuration = 0.02,
+    double sidebandOffset = 100.0,
+    double sidebandIntensity = 0.33,
+    double binauralOffset = 5.0,
   }) {
     if (_handle == null) return;
     _bindings.therapyUpdate(
@@ -128,6 +149,13 @@ class AudioEngine implements AudioControl {
       intensity,
       baseFreq,
       baseAmp,
+      rmpDepth,
+      rmpRate,
+      pipInterval,
+      pipDuration,
+      sidebandOffset,
+      sidebandIntensity,
+      binauralOffset,
     );
   }
 

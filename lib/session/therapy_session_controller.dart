@@ -30,6 +30,15 @@ class TherapySessionController {
   double baseFreq = 6200.0;
   double baseAmp = 0.2;
   
+  // Profile targets
+  double targetRmpDepth = 0.1;
+  double targetRmpRate = 5.0;
+  double targetPipInterval = 0.2;
+  double targetPipDuration = 0.02;
+  double targetSidebandOffset = 100.0;
+  double targetSidebandIntensity = 0.33;
+  double targetBinauralOffset = 5.0;
+  
   int warmupDuration = 0; // calculated based on total duration
   int mainDuration = 0;
   int cooldownDuration = 0;
@@ -44,6 +53,13 @@ class TherapySessionController {
     required double baseAmp,
     required double maxIntensity,
     required int durationMinutes,
+    double targetRmpDepth = 0.1,
+    double targetRmpRate = 5.0,
+    double targetPipInterval = 0.2,
+    double targetPipDuration = 0.02,
+    double targetSidebandOffset = 100.0,
+    double targetSidebandIntensity = 0.33,
+    double targetBinauralOffset = 5.0,
   }) {
       this.subthreshold = subthreshold;
       this.rmp = rmp;
@@ -53,6 +69,14 @@ class TherapySessionController {
       this.baseFreq = baseFreq;
       this.baseAmp = baseAmp;
       this.maxIntensity = maxIntensity;
+      
+      this.targetRmpDepth = targetRmpDepth;
+      this.targetRmpRate = targetRmpRate;
+      this.targetPipInterval = targetPipInterval;
+      this.targetPipDuration = targetPipDuration;
+      this.targetSidebandOffset = targetSidebandOffset;
+      this.targetSidebandIntensity = targetSidebandIntensity;
+      this.targetBinauralOffset = targetBinauralOffset;
       
       // Calculate phase durations based on total minutes
       // e.g., 20% warmup, 60% main, 20% cooldown
@@ -82,6 +106,13 @@ class TherapySessionController {
         intensity: 0.0,
         baseFreq: baseFreq,
         baseAmp: baseAmp,
+        rmpDepth: 0.0, // starts at 0, ramps up
+        rmpRate: targetRmpRate,
+        pipInterval: targetPipInterval,
+        pipDuration: targetPipDuration,
+        sidebandOffset: targetSidebandOffset,
+        sidebandIntensity: 0.0, // starts at 0
+        binauralOffset: targetBinauralOffset,
       );
       
       _timer?.cancel();
@@ -109,19 +140,27 @@ class TherapySessionController {
      int elapsed = (warmupDuration + mainDuration + cooldownDuration) - remain;
      double currentIntensity = 0.0;
      
+     double phaseRatio = 0.0;
      if (elapsed < warmupDuration) {
        currentPhase.value = TherapyPhase.warmup;
-       currentIntensity = (elapsed / warmupDuration) * maxIntensity;
+       phaseRatio = elapsed / warmupDuration;
+       currentIntensity = phaseRatio * maxIntensity;
      } else if (elapsed - warmupDuration < mainDuration) {
        currentPhase.value = TherapyPhase.mainPhase;
+       phaseRatio = 1.0;
        currentIntensity = maxIntensity;
      } else {
        currentPhase.value = TherapyPhase.cooldown;
        int cooldownElapsed = elapsed - warmupDuration - mainDuration;
-       currentIntensity = maxIntensity * (1.0 - (cooldownElapsed / cooldownDuration));
+       phaseRatio = 1.0 - (cooldownElapsed / cooldownDuration);
+       currentIntensity = maxIntensity * phaseRatio;
      }
      
      intensity.value = currentIntensity;
+     
+     // Dynamic Curves: rmpDepth and sidebandIntensity scale with the phase curve
+     double currentRmpDepth = targetRmpDepth * phaseRatio;
+     double currentSidebandIntensity = targetSidebandIntensity * phaseRatio;
      
      engine.therapyUpdate(
         subthreshold: subthreshold,
@@ -132,6 +171,13 @@ class TherapySessionController {
         intensity: currentIntensity,
         baseFreq: baseFreq,
         baseAmp: baseAmp,
+        rmpDepth: currentRmpDepth,
+        rmpRate: targetRmpRate,
+        pipInterval: targetPipInterval,
+        pipDuration: targetPipDuration,
+        sidebandOffset: targetSidebandOffset,
+        sidebandIntensity: currentSidebandIntensity,
+        binauralOffset: targetBinauralOffset,
       );
   }
   
