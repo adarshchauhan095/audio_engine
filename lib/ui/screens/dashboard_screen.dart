@@ -8,6 +8,7 @@ import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'therapy_session_screen.dart';
 import 'tinnitus_detection_screen.dart';
+import 'premium_features_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -88,6 +89,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Module Demo',
                 icon: Icons.science,
                 onTap: () => _pushScreen(context, ModuleDemoScreen(runtime: _runtime)),
+              ),
+              _ModuleCard(
+                title: 'Premium Features',
+                icon: Icons.star,
+                onTap: () => _pushScreen(context, PremiumFeaturesScreen(runtime: _runtime)),
               ),
               _ModuleCard(
                 title: 'Settings',
