@@ -15,7 +15,7 @@ public:
     void updateConfig(const TherapyConfig& config);
     bool isActive() const;
 
-    StereoSample process(double baseFreq, float baseAmp);
+    StereoSample process();
 
 private:
     TherapyConfig config_;

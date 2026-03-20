@@ -45,6 +45,19 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _error;
   bool _isDebugActionRunning = false;
 
+  // Long-run stability test durations (seconds).
+  int _longRunDurationSeconds = 30;
+  final List<int> _longRunDurationOptionsSeconds = const <int>[
+    15, 30, 45, 60,
+    300, 600, 1200, 1800, 3600,
+  ];
+
+  String _formatLongRunDuration(int seconds) {
+    if (seconds < 60) return '${seconds}s';
+    final int minutes = seconds ~/ 60;
+    return '${minutes}m';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -178,9 +191,10 @@ class _HomeScreenState extends State<HomeScreen> {
     await _sessionController!.runAdaptiveTest();
   }
 
-  Future<void> _runLongRunStabilityTest() async {
+  Future<void> _runLongRunStabilityTest({int? durationSeconds}) async {
     if (_sessionController == null) return;
-    await _sessionController!.runLongRunStabilityTest();
+    await _sessionController!
+        .runLongRunStabilityTest(durationSeconds: durationSeconds);
   }
 
   Future<void> _runExclusiveDebugAction(Future<void> Function() action) async {
@@ -253,6 +267,24 @@ class _HomeScreenState extends State<HomeScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
+              SizedBox(
+                width: 220,
+                child: DropdownButton<int>(
+                  value: _longRunDurationSeconds,
+                  isExpanded: true,
+                  items: _longRunDurationOptionsSeconds.map((int s) {
+                    return DropdownMenuItem<int>(
+                      value: s,
+                      child: Text(_formatLongRunDuration(s)),
+                    );
+                  }).toList(),
+                  onChanged: disabled
+                      ? null
+                      : (v) => setState(() {
+                            _longRunDurationSeconds = v ?? 30;
+                          }),
+                ),
+              ),
               FilledButton.icon(
                 onPressed: disabled
                     ? null
@@ -270,7 +302,11 @@ class _HomeScreenState extends State<HomeScreen> {
               FilledButton.icon(
                 onPressed: disabled
                     ? null
-                    : () => _runExclusiveDebugAction(_runLongRunStabilityTest),
+                    : () => _runExclusiveDebugAction(() {
+                          return _runLongRunStabilityTest(
+                            durationSeconds: _longRunDurationSeconds,
+                          );
+                        }),
                 icon: const Icon(Icons.hourglass_bottom),
                 label: const Text('Long run stability test'),
               ),

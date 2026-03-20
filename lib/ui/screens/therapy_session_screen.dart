@@ -17,6 +17,36 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
   int _selectedDurationMinutes = 5;
   double _intensity = 0.5;
 
+  void _logPresetConfiguration(TherapyProfilePreset p) {
+    debugPrint('Preset loaded: ${p.name}');
+
+    final double rmpDepth = p.rmpDepth ?? 0.1;
+    final double rmpRate = p.rmpRate ?? 5.0;
+    final double pipIntervalMs = (p.pipInterval ?? 0.2) * 1000.0;
+    final double pipDurationMs = (p.pipDuration ?? 0.02) * 1000.0;
+    final double sidebandOffset = p.sidebandOffset ?? 100.0;
+    final double sidebandIntensity = p.sidebandIntensity ?? 0.33;
+    final double binauralOffset = p.binauralOffset ?? 5.0;
+
+    if (p.rmp) {
+      debugPrint(
+        'RMP enabled (rate=${rmpRate.toStringAsFixed(2)}, depth=${rmpDepth.toStringAsFixed(3)})',
+      );
+    }
+    if (p.pip) {
+      debugPrint('PIP interval updated to ${pipIntervalMs.toStringAsFixed(0)} ms');
+      debugPrint('PIP duration updated to ${pipDurationMs.toStringAsFixed(0)} ms');
+    }
+    if (p.sidebands) {
+      debugPrint(
+        'SSS enabled (offset=${sidebandOffset.toStringAsFixed(1)}, intensity=${sidebandIntensity.toStringAsFixed(2)})',
+      );
+    }
+    if (p.binaural) {
+      debugPrint('Binaural enabled (offset=${binauralOffset.toStringAsFixed(1)} Hz)');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final runtime = widget.runtime;
@@ -32,9 +62,10 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
         builder: (context, isRunning, child) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 DropdownButton<TherapyProfilePreset>(
                   value: _selectedPreset,
                   isExpanded: true,
@@ -44,10 +75,37 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                       child: Text(preset.name),
                     );
                   }).toList(),
-                  onChanged: isRunning ? null : (v) {
-                    if (v != null) {
-                      setState(() => _selectedPreset = v);
-                      debugPrint('TherapySessionScreen: preset selected "${v.name}" (baseFreq=${v.baseFreq}, baseAmp=${v.baseAmp}, pip=${v.pip})');
+                  onChanged: (v) {
+                    if (v == null) return;
+
+                    setState(() => _selectedPreset = v);
+
+                    final double baseFreq = v.baseFreq ?? runtime.frequency.value;
+                    final double baseAmp = v.baseAmp ?? runtime.amplitude.value;
+
+                    // Keep the "Live Audio Settings" card consistent with the preset.
+                    if (v.baseFreq != null) runtime.setFrequency(v.baseFreq!);
+                    if (v.baseAmp != null) runtime.setAmplitude(v.baseAmp!);
+
+                    _logPresetConfiguration(v);
+
+                    if (isRunning) {
+                      session.updatePreset(
+                        subthreshold: v.subthreshold,
+                        rmp: v.rmp,
+                        pip: v.pip,
+                        sidebands: v.sidebands,
+                        binaural: v.binaural,
+                        baseFreq: baseFreq,
+                        baseAmp: baseAmp,
+                        targetRmpDepth: v.rmpDepth ?? 0.1,
+                        targetRmpRate: v.rmpRate ?? 5.0,
+                        targetPipInterval: v.pipInterval ?? 0.2,
+                        targetPipDuration: v.pipDuration ?? 0.02,
+                        targetSidebandOffset: v.sidebandOffset ?? 100.0,
+                        targetSidebandIntensity: v.sidebandIntensity ?? 0.33,
+                        targetBinauralOffset: v.binauralOffset ?? 5.0,
+                      );
                     }
                   },
                 ),
@@ -60,6 +118,54 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontStyle: FontStyle.italic,
                       ),
+                    ),
+                  ),
+                if (_selectedPreset != null) const SizedBox(height: 8),
+                if (_selectedPreset != null)
+                  Card(
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Builder(builder: (context) {
+                        final p = _selectedPreset!;
+                        final double baseFreq =
+                            p.baseFreq ?? runtime.frequency.value;
+                        final double baseAmp =
+                            p.baseAmp ?? runtime.amplitude.value;
+                        final double rmpDepth = p.rmpDepth ?? 0.1;
+                        final double rmpRate = p.rmpRate ?? 5.0;
+                        final double pipIntervalMs =
+                            (p.pipInterval ?? 0.2) * 1000.0;
+                        final double pipDurationMs =
+                            (p.pipDuration ?? 0.02) * 1000.0;
+                        final double sidebandOffset = p.sidebandOffset ?? 100.0;
+                        final double sidebandIntensity =
+                            p.sidebandIntensity ?? 0.33;
+                        final double binauralOffset =
+                            p.binauralOffset ?? 5.0;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Preset Parameters',
+                                style: Theme.of(context).textTheme.titleSmall),
+                            const SizedBox(height: 8),
+                            Text('Base Freq: ${baseFreq.toStringAsFixed(0)} Hz'),
+                            Text('Base Amp: ${baseAmp.toStringAsFixed(3)}'),
+                            const SizedBox(height: 8),
+                            Text('Modules:'),
+                            Text('Subthreshold: ${p.subthreshold ? 'On' : 'Off'}'),
+                            Text('RMP: ${p.rmp ? 'On' : 'Off'}'
+                                '${p.rmp ? ' (rate=${rmpRate.toStringAsFixed(2)}, depth=${rmpDepth.toStringAsFixed(3)})' : ''}'),
+                            Text('PIP: ${p.pip ? 'On' : 'Off'}'
+                                '${p.pip ? ' (interval=${pipIntervalMs.toStringAsFixed(0)}ms, duration=${pipDurationMs.toStringAsFixed(0)}ms)' : ''}'),
+                            Text('SSS: ${p.sidebands ? 'On' : 'Off'}'
+                                '${p.sidebands ? ' (offset=${sidebandOffset.toStringAsFixed(1)}, intensity=${sidebandIntensity.toStringAsFixed(2)})' : ''}'),
+                            Text('Binaural: ${p.binaural ? 'On' : 'Off'}'
+                                '${p.binaural ? ' (offset=${binauralOffset.toStringAsFixed(1)} Hz)' : ''}'),
+                          ],
+                        );
+                      }),
                     ),
                   ),
                 const SizedBox(height: 16),
@@ -139,7 +245,7 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                     );
                   },
                 ),
-                const Spacer(),
+                const SizedBox(height: 16),
                 FilledButton(
                     onPressed: () {
                     if (isRunning) {
@@ -151,6 +257,8 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                       final baseAmp = p.baseAmp ?? runtime.amplitude.value;
                       if (p.baseFreq != null) runtime.setFrequency(p.baseFreq!);
                       if (p.baseAmp != null) runtime.setAmplitude(p.baseAmp!);
+
+                      _logPresetConfiguration(p);
                       session.startSession(
                         subthreshold: p.subthreshold,
                         rmp: p.rmp,
@@ -176,7 +284,8 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                   ),
                   child: Text(isRunning ? 'Stop Session' : 'Start Session'),
                 ),
-              ],
+                ],
+              ),
             ),
           );
         },

@@ -97,6 +97,8 @@ static TherapyConfig createConfig(int subthreshold, int rmp, int pip,
   c.enablePIP = pip != 0;
   c.enableSidebands = sidebands != 0;
   c.enableBinaural = binaural != 0;
+  c.baseFreq = baseFreq;
+  c.baseAmp = baseAmp;
   c.therapyIntensity = intensity;
 
   c.rmpDepth = rmpDepth;

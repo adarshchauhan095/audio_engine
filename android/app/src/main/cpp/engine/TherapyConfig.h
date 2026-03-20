@@ -7,6 +7,11 @@ struct TherapyConfig {
   bool enableSidebands = false;
   bool enableBinaural = false;
 
+  // Preset base frequency/amplitude. These override the global engine
+  // oscillator values while therapy routing is active.
+  float baseFreq = 6200.0f;
+  float baseAmp = 0.2f;
+
   float therapyIntensity = 0.5f;
 
   // RMP

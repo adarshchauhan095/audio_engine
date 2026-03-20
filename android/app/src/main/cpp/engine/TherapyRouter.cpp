@@ -31,11 +31,13 @@ bool TherapyRouter::isActive() const {
          enableBinaural_.load(std::memory_order_acquire);
 }
 
-StereoSample TherapyRouter::process(double baseFreq, float baseAmp) {
+StereoSample TherapyRouter::process() {
   StereoSample out{0.0f, 0.0f};
   if (!isActive())
     return out;
 
+  const double baseFreq = config_.baseFreq;
+  const float baseAmp = config_.baseAmp;
   float amp = baseAmp * config_.therapyIntensity;
 
   if (enableSubthreshold_.load(std::memory_order_acquire)) {

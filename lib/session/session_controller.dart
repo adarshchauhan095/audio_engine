@@ -121,7 +121,10 @@ class SessionController {
     if (_testInProgress || _disposed) return;
     _testInProgress = true;
     final int steps = durationSeconds != null
-        ? (durationSeconds * 1000 / _longRunStepDelay.inMilliseconds).round().clamp(1, 600)
+        ? (durationSeconds * 1000 / _longRunStepDelay.inMilliseconds)
+            .round()
+            // Allow long durations (e.g., up to 60 minutes) for drift/leak testing.
+            .clamp(1, 200000)
         : _longRunSteps;
     try {
       _ensurePlaying();

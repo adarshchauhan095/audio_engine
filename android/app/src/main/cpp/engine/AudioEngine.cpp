@@ -24,6 +24,9 @@ bool AudioEngine::start() {
         amplitudeTarget_.load(std::memory_order_relaxed));
     transportSmoother_.setTarget(1.0f);
     running_.store(true, std::memory_order_relaxed);
+#ifndef NDEBUG
+    log("Engine started");
+#endif
     return true;
   }
 
@@ -58,12 +61,18 @@ bool AudioEngine::start() {
   }
 
   running_.store(true, std::memory_order_relaxed);
+#ifndef NDEBUG
+  log("Engine started");
+#endif
   return true;
 }
 
 void AudioEngine::stop() {
   std::lock_guard<std::mutex> lock(mutex_);
   running_.store(false, std::memory_order_relaxed);
+#ifndef NDEBUG
+  log("Engine stopped");
+#endif
   if (stream_) {
     transportSmoother_.setTarget(0.0f);
   }
@@ -117,7 +126,7 @@ int AudioEngine::therapyStart(const TherapyConfig &config) {
 int AudioEngine::therapyUpdate(const TherapyConfig &config) {
   std::lock_guard<std::mutex> lock(mutex_);
   therapyRouter_.updateConfig(config);
-  log("Therapy updated");
+//  log("Therapy updated");
   return 1;
 }
 
@@ -133,7 +142,6 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *,
                                                    void *audioData,
                                                    int32_t numFrames) {
   float *out = static_cast<float *>(audioData);
-  double freq = currentFreq_.load(std::memory_order_relaxed);
   bool isStereo = stereoEnabled_.load(std::memory_order_relaxed);
 
   for (int32_t i = 0; i < numFrames; ++i) {
@@ -141,7 +149,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *,
     const float amp = amplitudeSmoother_.process();
 
     if (therapyRouter_.isActive()) {
-      StereoSample sr = therapyRouter_.process(freq, amp);
+      StereoSample sr = therapyRouter_.process();
       if (!isStereo) {
         float mono = (sr.left + sr.right) * 0.5f;
         sr.left = mono;

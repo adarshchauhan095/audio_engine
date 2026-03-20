@@ -208,6 +208,73 @@ class TherapySessionController {
      }
   }
   
+  /// Live-updates the current therapy configuration while a session
+  /// is running. The phase/timer continues uninterrupted.
+  void updatePreset({
+    required bool subthreshold,
+    required bool rmp,
+    required bool pip,
+    required bool sidebands,
+    required bool binaural,
+    required double baseFreq,
+    required double baseAmp,
+    required double targetRmpDepth,
+    required double targetRmpRate,
+    required double targetPipInterval,
+    required double targetPipDuration,
+    required double targetSidebandOffset,
+    required double targetSidebandIntensity,
+    required double targetBinauralOffset,
+  }) {
+    // Update stored fields used by the periodic therapyUpdate tick.
+    this.subthreshold = subthreshold;
+    this.rmp = rmp;
+    this.pip = pip;
+    this.sidebands = sidebands;
+    this.binaural = binaural;
+
+    this.baseFreq = baseFreq;
+    this.baseAmp = baseAmp;
+
+    this.targetRmpDepth = targetRmpDepth;
+    this.targetRmpRate = targetRmpRate;
+    this.targetPipInterval = targetPipInterval;
+    this.targetPipDuration = targetPipDuration;
+    this.targetSidebandOffset = targetSidebandOffset;
+    this.targetSidebandIntensity = targetSidebandIntensity;
+    this.targetBinauralOffset = targetBinauralOffset;
+
+    // Mirror TherapySessionController's _onTick curve:
+    // - warmup: intensity = phaseRatio * maxIntensity
+    // - main: intensity = maxIntensity (phaseRatio=1)
+    // - cooldown: intensity = maxIntensity * (1 - t/cooldown)
+    final double maxI = maxIntensity;
+    final double phaseRatio =
+        maxI <= 0.0 ? 0.0 : (intensity.value / maxI).clamp(0.0, 1.0);
+    final double currentRmpDepth = targetRmpDepth * phaseRatio;
+    final double currentSidebandIntensity =
+        targetSidebandIntensity * phaseRatio;
+
+    // Apply immediately so the audio output reflects the preset change.
+    engine.therapyUpdate(
+      subthreshold: subthreshold,
+      rmp: rmp,
+      pip: pip,
+      sidebands: sidebands,
+      binaural: binaural,
+      intensity: intensity.value,
+      baseFreq: baseFreq,
+      baseAmp: baseAmp,
+      rmpDepth: currentRmpDepth,
+      rmpRate: targetRmpRate,
+      pipInterval: targetPipInterval,
+      pipDuration: targetPipDuration,
+      sidebandOffset: targetSidebandOffset,
+      sidebandIntensity: currentSidebandIntensity,
+      binauralOffset: targetBinauralOffset,
+    );
+  }
+
   void dispose() {
      _timer?.cancel();
      isRunning.dispose();
