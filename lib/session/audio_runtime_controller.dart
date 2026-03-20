@@ -9,6 +9,7 @@ import 'package:ffi/ffi.dart';
 import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
 import '../models/session_params.dart';
+import '../storage/therapy_adherence_storage.dart';
 import 'session_controller.dart';
 import 'therapy_session_controller.dart';
 
@@ -91,6 +92,28 @@ class AudioRuntimeController {
   bool _sessionCancelRequested = false;
   bool _disposed = false;
 
+  Timer? _therapyAdherenceDebounceTimer;
+  bool _isRestoringTherapyAdherence = false;
+
+  void _scheduleTherapyAdherenceSave() {
+    if (_isRestoringTherapyAdherence) return;
+    _therapyAdherenceDebounceTimer?.cancel();
+    _therapyAdherenceDebounceTimer = Timer(const Duration(seconds: 2), () {
+      final int seconds =
+          _therapySessionController?.totalTherapySeconds.value ?? 0;
+      TherapyAdherenceStorage.saveTotalTherapySeconds(seconds);
+    });
+  }
+
+  void _restoreTherapyAdherence() {
+    _isRestoringTherapyAdherence = true;
+    () async {
+      final int saved = await TherapyAdherenceStorage.loadTotalTherapySeconds();
+      _therapySessionController?.totalTherapySeconds.value = saved;
+      _isRestoringTherapyAdherence = false;
+    }();
+  }
+
   void _initEngine() {
     if (!Platform.isAndroid) {
       error.value = 'Native audio only on Android';
@@ -121,7 +144,10 @@ class AudioRuntimeController {
       );
       
       _therapySessionController = TherapySessionController(_engine!);
-      
+      _therapySessionController!.totalTherapySeconds
+          .addListener(_scheduleTherapyAdherenceSave);
+      _restoreTherapyAdherence();
+
       _logCallable = NativeCallable<LogCallbackC>.listener(_logNativeMessage);
       _engine!.registerLogCallback(_logCallable!.nativeFunction);
     } catch (e) {
@@ -338,6 +364,10 @@ class AudioRuntimeController {
   void dispose() {
     _disposed = true;
     _logCallable?.close();
+    _therapyAdherenceDebounceTimer?.cancel();
+    _therapySessionController
+        ?.totalTherapySeconds
+        .removeListener(_scheduleTherapyAdherenceSave);
     endRunningSession();
     _stopSessionTicker();
     _sessionController?.dispose();

@@ -1,4 +1,5 @@
 #include "TherapyRouter.h"
+#include <cmath>
 
 void TherapyRouter::init(double sampleRate) {
   subthreshold_.init(sampleRate);
@@ -10,6 +11,7 @@ void TherapyRouter::init(double sampleRate) {
 
 void TherapyRouter::updateConfig(const TherapyConfig &config) {
   bool wasActive = isActive();
+  const TherapyConfig prev = config_;
   config_ = config;
   enableSubthreshold_.store(config_.enableSubthreshold, std::memory_order_release);
   enableRMP_.store(config_.enableRMP, std::memory_order_release);
@@ -17,9 +19,22 @@ void TherapyRouter::updateConfig(const TherapyConfig &config) {
   enableSidebands_.store(config_.enableSidebands, std::memory_order_release);
   enableBinaural_.store(config_.enableBinaural, std::memory_order_release);
 
-  if (wasActive && !isActive()) {
+  const bool nowActive = isActive();
+  if (wasActive && !nowActive) {
     rmp_.reset();
     pip_.reset();
+  }
+
+  // If PIP parameters change while PIP stays enabled, reset so the new
+  // interval/duration schedule takes effect immediately.
+  if (enablePIP_.load(std::memory_order_acquire)) {
+    const float intervalChanged =
+        std::fabs(prev.pipInterval - config_.pipInterval) > 1e-6f;
+    const float durationChanged =
+        std::fabs(prev.pipDuration - config_.pipDuration) > 1e-6f;
+    if (intervalChanged || durationChanged) {
+      pip_.reset();
+    }
   }
 }
 

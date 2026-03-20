@@ -18,6 +18,7 @@ class TherapySessionController {
   Timer? _timer;
   int _ticksCount = 0;
   DateTime? _endTime;
+  bool _stopRequested = false;
   
   // configurable profile
   bool subthreshold = false;
@@ -61,6 +62,7 @@ class TherapySessionController {
     double targetSidebandIntensity = 0.33,
     double targetBinauralOffset = 5.0,
   }) {
+      _stopRequested = false;
       this.subthreshold = subthreshold;
       this.rmp = rmp;
       this.pip = pip;
@@ -126,6 +128,7 @@ class TherapySessionController {
   }
   
   void _onTick(Timer timer) {
+     if (_stopRequested) return;
      _ticksCount++;
      if (_ticksCount >= 5) {
        totalTherapySeconds.value++;
@@ -192,20 +195,20 @@ class TherapySessionController {
   }
   
   void stopSession() {
+     _stopRequested = true;
      _timer?.cancel();
      _timer = null;
      isRunning.value = false;
      currentPhase.value = TherapyPhase.idle;
-     int stopResult = engine.therapyStop();
+
+     // Mute transport first to minimize discontinuities while disabling DSP.
+     engine.stop();
+
+     final int stopResult = engine.therapyStop();
      if (stopResult < 0) {
        debugPrint('TherapySessionController: engine.therapyStop returned error $stopResult');
-     } else {
-       debugPrint('TherapySessionController: session stopped');
      }
-     // Opt to stop engine as well if Therapy takes full control
-     if (engine.isRunning) {
-       engine.stop();
-     }
+     debugPrint('TherapySessionController: session stopped');
   }
   
   /// Live-updates the current therapy configuration while a session
@@ -226,6 +229,7 @@ class TherapySessionController {
     required double targetSidebandIntensity,
     required double targetBinauralOffset,
   }) {
+    if (_stopRequested) return;
     // Update stored fields used by the periodic therapyUpdate tick.
     this.subthreshold = subthreshold;
     this.rmp = rmp;
