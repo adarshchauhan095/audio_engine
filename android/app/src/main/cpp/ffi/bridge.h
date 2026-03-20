@@ -85,6 +85,15 @@ int audio_therapy_update(NativeAudioHandle handle, int subthreshold, int rmp,
 
 int audio_therapy_stop(NativeAudioHandle handle);
 
+/// Read-only normalized therapy module meters.
+/// index mapping:
+/// 0 = Subthreshold
+/// 1 = RMP
+/// 2 = PIP
+/// 3 = Sidebands (SSS)
+/// 4 = Binaural
+float audio_get_therapy_module_meter(NativeAudioHandle handle, int index);
+
 void audio_set_stereo_enabled(NativeAudioHandle handle, int enabled);
 
 void audio_register_log_callback(NativeAudioHandle handle, AudioLogCallback cb);

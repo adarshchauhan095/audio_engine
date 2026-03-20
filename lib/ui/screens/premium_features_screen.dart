@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../session/audio_runtime_controller.dart';
+import '../widgets/therapy_modules_meters_panel.dart';
 
 class PremiumFeaturesScreen extends StatefulWidget {
   const PremiumFeaturesScreen({super.key, required this.runtime});
@@ -22,6 +23,7 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
   double _intensity = 0.5;
 
   bool _isDemoRunning = false;
+  DateTime? _demoStartedAt;
 
   void _updateEngine() {
     if (!_isDemoRunning) return;
@@ -52,8 +54,10 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
   void _toggleDemo() {
     if (!widget.runtime.hasEngine) return;
     
+    final bool nextRunning = !_isDemoRunning;
     setState(() {
-      _isDemoRunning = !_isDemoRunning;
+      _isDemoRunning = nextRunning;
+      _demoStartedAt = nextRunning ? DateTime.now() : null;
     });
 
     if (_isDemoRunning) {
@@ -99,6 +103,7 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
     if (_isDemoRunning) {
       widget.runtime.engine?.therapyStop();
     }
+    _demoStartedAt = null;
     super.deactivate();
   }
 
@@ -241,6 +246,35 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            ValueListenableBuilder<bool>(
+              valueListenable: widget.runtime.playing,
+              builder: (context, playing, _) {
+                return TherapyModulesMetersPanel(
+                  runtime: widget.runtime,
+                  isRunning: _isDemoRunning && playing,
+                  intensityProvider: () => _intensity,
+                  elapsedSecondsProvider: () {
+                    final started = _demoStartedAt;
+                    if (started == null) return 0.0;
+                    final ms = DateTime.now().difference(started).inMilliseconds;
+                    return ms / 1000.0;
+                  },
+                  subthresholdEnabled: false,
+                  rmpEnabled: false,
+                  pipEnabled: false,
+                  sssEnabled: false,
+                  binauralEnabled: _enableBinaural,
+                  rmpDepth: 0.1,
+                  rmpRate: 5.0,
+                  pipIntervalSeconds: 0.2,
+                  pipDurationSeconds: 0.02,
+                  sidebandOffset: 100.0,
+                  sidebandIntensity: 0.33,
+                  binauralOffset: _binauralOffset,
+                );
+              },
             ),
             const SizedBox(height: 24),
 

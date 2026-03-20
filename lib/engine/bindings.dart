@@ -31,6 +31,9 @@ typedef _TherapyFuncDart = int Function(NativeAudioHandle, int, int, int, int, i
 typedef _TherapyStopFuncC = Int32 Function(NativeAudioHandle);
 typedef _TherapyStopFuncDart = int Function(NativeAudioHandle);
 
+typedef _GetTherapyModuleMeterC = Float Function(NativeAudioHandle, Int32);
+typedef _GetTherapyModuleMeterDart = double Function(NativeAudioHandle, int);
+
 typedef LogCallbackC = Void Function(Pointer<Utf8>);
 typedef _RegisterLogC = Void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
 typedef _RegisterLogDart = void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
@@ -53,6 +56,7 @@ class NativeBindings {
   late final _TherapyFuncDart _therapyStart;
   late final _TherapyFuncDart _therapyUpdate;
   late final _TherapyStopFuncDart _therapyStop;
+  late final _GetTherapyModuleMeterDart _getTherapyModuleMeter;
   late final _RegisterLogDart _registerLogCallback;
   late final _SetIntDart _setStereoEnabled;
 
@@ -103,6 +107,10 @@ class NativeBindings {
           _TherapyStopFuncC,
           _TherapyStopFuncDart
         >('audio_therapy_stop');
+    _getTherapyModuleMeter = lib.lookupFunction<
+        _GetTherapyModuleMeterC, _GetTherapyModuleMeterDart>(
+      'audio_get_therapy_module_meter',
+    );
     _registerLogCallback = lib.lookupFunction<_RegisterLogC, _RegisterLogDart>('audio_register_log_callback');
     _setStereoEnabled = lib.lookupFunction<_SetIntC, _SetIntDart>('audio_set_stereo_enabled');
   }
@@ -145,6 +153,9 @@ class NativeBindings {
       _therapyUpdate(handle, sub, rmp, pip, side, bin, intensity, freq, amp, rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset, sidebandIntensity, binauralOffset);
       
   int therapyStop(NativeAudioHandle handle) => _therapyStop(handle);
+
+  double getTherapyModuleMeter(NativeAudioHandle handle, int index) =>
+      _getTherapyModuleMeter(handle, index);
   
   void setStereoEnabled(NativeAudioHandle handle, int enabled) => _setStereoEnabled(handle, enabled);
   

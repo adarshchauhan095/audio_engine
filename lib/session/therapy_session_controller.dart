@@ -13,6 +13,9 @@ class TherapySessionController {
   final ValueNotifier<TherapyPhase> currentPhase = ValueNotifier(TherapyPhase.idle);
   final ValueNotifier<int> remainingSeconds = ValueNotifier(0);
   final ValueNotifier<double> intensity = ValueNotifier(0.0);
+  // High-resolution elapsed therapy seconds (ms precision), used for UI-only
+  // expected graphs (e.g., PIP active window timing).
+  final ValueNotifier<double> elapsedSeconds = ValueNotifier(0.0);
   final ValueNotifier<int> totalTherapySeconds = ValueNotifier(0);
   
   Timer? _timer;
@@ -93,6 +96,7 @@ class TherapySessionController {
       
       remainingSeconds.value = totalSecondsConfigured;
       _endTime = DateTime.now().add(Duration(seconds: totalSecondsConfigured));
+      elapsedSeconds.value = 0.0;
       
       // Ensure engine is running
       if (!engine.isRunning) {
@@ -138,7 +142,15 @@ class TherapySessionController {
      if (_endTime == null) return;
      
      final now = DateTime.now();
-     int remain = _endTime!.difference(now).inSeconds;
+     final int remainMs = _endTime!.difference(now).inMilliseconds;
+     final int remain = remainMs ~/ 1000;
+
+     final int totalSecondsConfigured =
+         warmupDuration + mainDuration + cooldownDuration;
+     final int totalMs = totalSecondsConfigured * 1000;
+     final int elapsedMs = totalMs - remainMs;
+     elapsedSeconds.value =
+         (elapsedMs / 1000.0).clamp(0.0, totalSecondsConfigured.toDouble());
      
      if (remain <= 0) {
        stopSession();
@@ -200,6 +212,7 @@ class TherapySessionController {
      _timer = null;
      isRunning.value = false;
      currentPhase.value = TherapyPhase.idle;
+     elapsedSeconds.value = 0.0;
 
      // Mute transport first to minimize discontinuities while disabling DSP.
      engine.stop();
@@ -285,5 +298,6 @@ class TherapySessionController {
      currentPhase.dispose();
      remainingSeconds.dispose();
      intensity.dispose();
+     elapsedSeconds.dispose();
   }
 }

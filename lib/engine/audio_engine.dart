@@ -164,6 +164,19 @@ class AudioEngine implements AudioControl {
     return _bindings.therapyStop(_handle!);
   }
 
+  /// Returns normalized, read-only meter value for the therapy module.
+  ///
+  /// index mapping:
+  /// 0 = Subthreshold
+  /// 1 = RMP
+  /// 2 = PIP
+  /// 3 = Sidebands (SSS)
+  /// 4 = Binaural
+  double getTherapyModuleMeter(int index) {
+    if (_handle == null) return 0.0;
+    return _bindings.getTherapyModuleMeter(_handle!, index);
+  }
+
   void setStereoEnabled(bool enabled) {
     if (_handle == null) return;
     _bindings.setStereoEnabled(_handle!, enabled ? 1 : 0);

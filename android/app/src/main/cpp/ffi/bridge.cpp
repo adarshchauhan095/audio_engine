@@ -142,6 +142,10 @@ int audio_therapy_stop(NativeAudioHandle h) {
   return static_cast<AudioEngine *>(h)->therapyStop();
 }
 
+float audio_get_therapy_module_meter(NativeAudioHandle h, int index) {
+  return static_cast<AudioEngine *>(h)->getTherapyModuleMeter(index);
+}
+
 void audio_set_stereo_enabled(NativeAudioHandle h, int enabled) {
   static_cast<AudioEngine *>(h)->setStereoEnabled(enabled != 0);
 }

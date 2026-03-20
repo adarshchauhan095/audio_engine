@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../session/audio_runtime_controller.dart';
 import '../../session/profile_session_catalog.dart';
 import '../../session/therapy_session_controller.dart';
+import '../widgets/therapy_modules_meters_panel.dart';
 
 class TherapySessionScreen extends StatefulWidget {
   const TherapySessionScreen({super.key, required this.runtime});
@@ -394,6 +395,25 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                       ],
                     );
                   },
+                ),
+                const SizedBox(height: 16),
+                TherapyModulesMetersPanel(
+                  runtime: runtime,
+                  isRunning: isRunning,
+                  intensityProvider: () => session.intensity.value,
+                  elapsedSecondsProvider: () => session.elapsedSeconds.value,
+                  subthresholdEnabled: _subthreshold,
+                  rmpEnabled: _rmp,
+                  pipEnabled: _pip,
+                  sssEnabled: _sss,
+                  binauralEnabled: _binaural,
+                  rmpDepth: _rmpDepth,
+                  rmpRate: _rmpRate,
+                  pipIntervalSeconds: _pipInterval,
+                  pipDurationSeconds: _pipDuration,
+                  sidebandOffset: _sidebandOffset,
+                  sidebandIntensity: _sidebandIntensity,
+                  binauralOffset: _binauralOffset,
                 ),
                 const SizedBox(height: 16),
                 FilledButton(

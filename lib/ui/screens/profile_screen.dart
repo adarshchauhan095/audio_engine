@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../session/audio_runtime_controller.dart';
 import '../../session/profile_session_catalog.dart';
+import '../widgets/therapy_modules_meters_panel.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.runtime});
@@ -11,6 +12,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  TherapyProfilePreset? _activePreset;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,6 +136,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               );
                             },
                           ),
+                          const SizedBox(height: 16),
+                          TherapyModulesMetersPanel(
+                            runtime: widget.runtime,
+                            isRunning: running,
+                            intensityProvider: () =>
+                                widget.runtime.therapySession!.intensity.value,
+                            elapsedSecondsProvider: () =>
+                                widget.runtime.therapySession!.elapsedSeconds.value,
+                            subthresholdEnabled: _activePreset?.subthreshold ?? false,
+                            rmpEnabled: _activePreset?.rmp ?? false,
+                            pipEnabled: _activePreset?.pip ?? false,
+                            sssEnabled: _activePreset?.sidebands ?? false,
+                            binauralEnabled: _activePreset?.binaural ?? false,
+                            rmpDepth: _activePreset?.rmpDepth ?? 0.1,
+                            rmpRate: _activePreset?.rmpRate ?? 5.0,
+                            pipIntervalSeconds: _activePreset?.pipInterval ?? 0.2,
+                            pipDurationSeconds:
+                                _activePreset?.pipDuration ?? 0.02,
+                            sidebandOffset: _activePreset?.sidebandOffset ?? 100.0,
+                            sidebandIntensity:
+                                _activePreset?.sidebandIntensity ?? 0.33,
+                            binauralOffset: _activePreset?.binauralOffset ?? 5.0,
+                          ),
                         ],
                       ),
                     ),
@@ -158,6 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () {
                     final session = widget.runtime.therapySession;
                     if (session != null) {
+                      _activePreset = preset;
                         final baseFreq = preset.baseFreq ?? widget.runtime.frequency.value;
                         final baseAmp = preset.baseAmp ?? widget.runtime.amplitude.value;
                         if (preset.baseFreq != null) widget.runtime.setFrequency(preset.baseFreq!);

@@ -138,6 +138,11 @@ int AudioEngine::therapyStop() {
   return 1;
 }
 
+float AudioEngine::getTherapyModuleMeter(int index) const {
+  // TherapyRouter meters are lock-free atomics updated by the audio thread.
+  return therapyRouter_.moduleMeter(index);
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *,
                                                    void *audioData,
                                                    int32_t numFrames) {

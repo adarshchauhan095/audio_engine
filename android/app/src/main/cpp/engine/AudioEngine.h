@@ -42,6 +42,11 @@ public:
   int therapyUpdate(const TherapyConfig &config);
   int therapyStop();
 
+  /// Read-only normalized meters for therapy modules.
+  /// index mapping is defined in TherapyRouter::moduleMeter():
+  /// 0 = Subthreshold, 1 = RMP, 2 = PIP, 3 = Sidebands, 4 = Binaural.
+  float getTherapyModuleMeter(int index) const;
+
   typedef void (*LogCallback)(const char *);
   void setLogCallback(LogCallback cb) { logCb_ = cb; }
 

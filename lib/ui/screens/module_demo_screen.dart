@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../session/audio_runtime_controller.dart';
+import '../widgets/therapy_modules_meters_panel.dart';
 
 class ModuleDemoScreen extends StatefulWidget {
   const ModuleDemoScreen({super.key, required this.runtime});
@@ -27,6 +28,7 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
   double _intensity = 0.5;
 
   bool _isDemoRunning = false;
+  DateTime? _demoStartedAt;
 
   void _updateEngine() {
     if (!_isDemoRunning) return;
@@ -55,9 +57,11 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
 
   void _toggleDemo() {
     if (!widget.runtime.hasEngine) return;
-    
+
+    final bool nextRunning = !_isDemoRunning;
     setState(() {
-      _isDemoRunning = !_isDemoRunning;
+      _isDemoRunning = nextRunning;
+      _demoStartedAt = nextRunning ? DateTime.now() : null;
     });
 
     if (_isDemoRunning) {
@@ -91,6 +95,7 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
     if (_isDemoRunning) {
       widget.runtime.engine?.therapyStop();
     }
+    _demoStartedAt = null;
     super.deactivate();
   }
 
@@ -278,6 +283,34 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
               ),
             ],
             const SizedBox(height: 48),
+            ValueListenableBuilder<bool>(
+              valueListenable: widget.runtime.playing,
+              builder: (context, playing, _) {
+                return TherapyModulesMetersPanel(
+                  runtime: widget.runtime,
+                  isRunning: _isDemoRunning && playing,
+                  intensityProvider: () => _intensity,
+                  elapsedSecondsProvider: () {
+                    final started = _demoStartedAt;
+                    if (started == null) return 0.0;
+                    final ms = DateTime.now().difference(started).inMilliseconds;
+                    return ms / 1000.0;
+                  },
+                  subthresholdEnabled: _enableSubthreshold,
+                  rmpEnabled: _enableRmp,
+                  pipEnabled: _enablePip,
+                  sssEnabled: _enableSidebands,
+                  binauralEnabled: false,
+                  rmpDepth: _rmpDepth,
+                  rmpRate: _rmpRate,
+                  pipIntervalSeconds: _pipInterval,
+                  pipDurationSeconds: _pipDuration,
+                  sidebandOffset: _sidebandOffset,
+                  sidebandIntensity: _sidebandIntensity,
+                  binauralOffset: 5.0,
+                );
+              },
+            ),
           ],
         ),
       ),
