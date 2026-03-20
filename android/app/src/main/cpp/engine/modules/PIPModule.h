@@ -6,6 +6,7 @@
 class PIPModule {
 public:
   void init(double sampleRate);
+  void reset();
   float process(double baseFreq, float baseAmp, float pipInterval,
                 float pipDuration);
 

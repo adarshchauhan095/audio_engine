@@ -116,14 +116,18 @@ class SessionController {
     }
   }
 
-  Future<void> runLongRunStabilityTest() async {
+  /// [durationSeconds] if provided overrides the default run length (default ~30s).
+  Future<void> runLongRunStabilityTest({int? durationSeconds}) async {
     if (_testInProgress || _disposed) return;
     _testInProgress = true;
+    final int steps = durationSeconds != null
+        ? (durationSeconds * 1000 / _longRunStepDelay.inMilliseconds).round().clamp(1, 600)
+        : _longRunSteps;
     try {
       _ensurePlaying();
-      for (int i = 0; i < _longRunSteps; i++) {
+      for (int i = 0; i < steps; i++) {
         if (_disposed) break;
-        final t = i / (_longRunSteps - 1);
+        final t = steps > 1 ? i / (steps - 1) : 1.0;
         _onProgress?.call(t);
         final hz = 180.0 + 600.0 * t;
         final amp = 0.25 + 0.25 * (0.5 + 0.5 * math.sin(t * math.pi * 8.0));

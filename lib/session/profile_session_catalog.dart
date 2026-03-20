@@ -21,6 +21,15 @@ class TherapyProfilePreset {
     this.pip = false,
     this.sidebands = false,
     this.binaural = false,
+    this.baseFreq,
+    this.baseAmp,
+    this.rmpDepth,
+    this.rmpRate,
+    this.pipInterval,
+    this.pipDuration,
+    this.sidebandOffset,
+    this.sidebandIntensity,
+    this.binauralOffset,
   });
 
   final String name;
@@ -30,28 +39,56 @@ class TherapyProfilePreset {
   final bool pip;
   final bool sidebands;
   final bool binaural;
-  
+
+  /// Per-preset parameters. When null, session uses runtime/default values.
+  final double? baseFreq;
+  final double? baseAmp;
+  final double? rmpDepth;
+  final double? rmpRate;
+  final double? pipInterval;
+  final double? pipDuration;
+  final double? sidebandOffset;
+  final double? sidebandIntensity;
+  final double? binauralOffset;
+
   static const List<TherapyProfilePreset> presets = [
     TherapyProfilePreset(
-      name: 'Basic', 
+      name: 'Basic',
       description: 'Uses only basic sub-threshold noise to gently stimulate the auditory system.',
-      subthreshold: true
+      subthreshold: true,
+      baseFreq: 4000.0,
+      baseAmp: 0.15,
     ),
     TherapyProfilePreset(
-      name: 'Standard', 
+      name: 'Standard',
       description: 'Includes sub-threshold noise along with Random Modulation Piping (RMP) and Periodic Integration Pulses (PIP) for engaged therapy.',
-      subthreshold: true, 
-      rmp: true, 
-      pip: true
+      subthreshold: true,
+      rmp: true,
+      pip: true,
+      baseFreq: 5000.0,
+      baseAmp: 0.2,
+      rmpDepth: 0.08,
+      rmpRate: 5.0,
+      pipInterval: 0.25,
+      pipDuration: 0.02,
     ),
     TherapyProfilePreset(
-      name: 'Premium', 
+      name: 'Premium',
       description: 'Full featured. Adds sideband harmonics and binaural beats for deep habituation therapy.',
-      subthreshold: true, 
-      rmp: true, 
-      pip: true, 
-      sidebands: true, 
-      binaural: true
+      subthreshold: true,
+      rmp: true,
+      pip: true,
+      sidebands: true,
+      binaural: true,
+      baseFreq: 6200.0,
+      baseAmp: 0.22,
+      rmpDepth: 0.1,
+      rmpRate: 5.0,
+      pipInterval: 0.2,
+      pipDuration: 0.02,
+      sidebandOffset: 120.0,
+      sidebandIntensity: 0.35,
+      binauralOffset: 6.0,
     ),
   ];
 }

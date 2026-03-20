@@ -9,12 +9,26 @@ void TherapyRouter::init(double sampleRate) {
 }
 
 void TherapyRouter::updateConfig(const TherapyConfig &config) {
+  bool wasActive = isActive();
   config_ = config;
+  enableSubthreshold_.store(config_.enableSubthreshold, std::memory_order_release);
+  enableRMP_.store(config_.enableRMP, std::memory_order_release);
+  enablePIP_.store(config_.enablePIP, std::memory_order_release);
+  enableSidebands_.store(config_.enableSidebands, std::memory_order_release);
+  enableBinaural_.store(config_.enableBinaural, std::memory_order_release);
+
+  if (wasActive && !isActive()) {
+    rmp_.reset();
+    pip_.reset();
+  }
 }
 
 bool TherapyRouter::isActive() const {
-  return config_.enableSubthreshold || config_.enableRMP || config_.enablePIP ||
-         config_.enableSidebands || config_.enableBinaural;
+  return enableSubthreshold_.load(std::memory_order_acquire) ||
+         enableRMP_.load(std::memory_order_acquire) ||
+         enablePIP_.load(std::memory_order_acquire) ||
+         enableSidebands_.load(std::memory_order_acquire) ||
+         enableBinaural_.load(std::memory_order_acquire);
 }
 
 StereoSample TherapyRouter::process(double baseFreq, float baseAmp) {
@@ -24,33 +38,33 @@ StereoSample TherapyRouter::process(double baseFreq, float baseAmp) {
 
   float amp = baseAmp * config_.therapyIntensity;
 
-  if (config_.enableSubthreshold) {
+  if (enableSubthreshold_.load(std::memory_order_acquire)) {
     float s = subthreshold_.process(baseFreq, amp);
     out.left += s;
     out.right += s;
   }
 
-  if (config_.enableRMP) {
+  if (enableRMP_.load(std::memory_order_acquire)) {
     float s = rmp_.process(baseFreq, amp, config_.rmpDepth, config_.rmpRate);
     out.left += s;
     out.right += s;
   }
 
-  if (config_.enablePIP) {
+  if (enablePIP_.load(std::memory_order_acquire)) {
     float s =
         pip_.process(baseFreq, amp, config_.pipInterval, config_.pipDuration);
     out.left += s;
     out.right += s;
   }
 
-  if (config_.enableSidebands) {
+  if (enableSidebands_.load(std::memory_order_acquire)) {
     float s = sidebands_.process(baseFreq, amp, config_.sidebandOffset,
                                  config_.sidebandIntensity);
     out.left += s;
     out.right += s;
   }
 
-  if (config_.enableBinaural) {
+  if (enableBinaural_.load(std::memory_order_acquire)) {
     StereoSample b = binaural_.process(baseFreq, amp, config_.binauralOffset);
     out.left += b.left;
     out.right += b.right;

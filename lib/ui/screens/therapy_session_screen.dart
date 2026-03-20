@@ -44,7 +44,12 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                       child: Text(preset.name),
                     );
                   }).toList(),
-                  onChanged: isRunning ? null : (v) => setState(() => _selectedPreset = v),
+                  onChanged: isRunning ? null : (v) {
+                    if (v != null) {
+                      setState(() => _selectedPreset = v);
+                      debugPrint('TherapySessionScreen: preset selected "${v.name}" (baseFreq=${v.baseFreq}, baseAmp=${v.baseAmp}, pip=${v.pip})');
+                    }
+                  },
                 ),
                 if (_selectedPreset != null)
                   Padding(
@@ -136,21 +141,33 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                 ),
                 const Spacer(),
                 FilledButton(
-                  onPressed: () {
+                    onPressed: () {
                     if (isRunning) {
                       session.stopSession();
                     } else {
                       if (_selectedPreset == null) return;
+                      final p = _selectedPreset!;
+                      final baseFreq = p.baseFreq ?? runtime.frequency.value;
+                      final baseAmp = p.baseAmp ?? runtime.amplitude.value;
+                      if (p.baseFreq != null) runtime.setFrequency(p.baseFreq!);
+                      if (p.baseAmp != null) runtime.setAmplitude(p.baseAmp!);
                       session.startSession(
-                        subthreshold: _selectedPreset!.subthreshold,
-                        rmp: _selectedPreset!.rmp,
-                        pip: _selectedPreset!.pip,
-                        sidebands: _selectedPreset!.sidebands,
-                        binaural: _selectedPreset!.binaural,
-                        baseFreq: runtime.frequency.value, // uses current detection freq
-                        baseAmp: runtime.amplitude.value, // uses current detection amp
-                        maxIntensity: _intensity, // uses slider chosen intensity
+                        subthreshold: p.subthreshold,
+                        rmp: p.rmp,
+                        pip: p.pip,
+                        sidebands: p.sidebands,
+                        binaural: p.binaural,
+                        baseFreq: baseFreq,
+                        baseAmp: baseAmp,
+                        maxIntensity: _intensity,
                         durationMinutes: _selectedDurationMinutes,
+                        targetRmpDepth: p.rmpDepth ?? 0.1,
+                        targetRmpRate: p.rmpRate ?? 5.0,
+                        targetPipInterval: p.pipInterval ?? 0.2,
+                        targetPipDuration: p.pipDuration ?? 0.02,
+                        targetSidebandOffset: p.sidebandOffset ?? 100.0,
+                        targetSidebandIntensity: p.sidebandIntensity ?? 0.33,
+                        targetBinauralOffset: p.binauralOffset ?? 5.0,
                       );
                     }
                   },

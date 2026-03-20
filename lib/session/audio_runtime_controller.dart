@@ -14,7 +14,7 @@ import 'therapy_session_controller.dart';
 
 void _logNativeMessage(Pointer<Utf8> msg) {
   final str = msg.toDartString();
-  print('NativeEngine: $str');
+  debugPrint('NativeEngine: $str');
 }
 
 class SessionRunSnapshot {
@@ -330,9 +330,9 @@ class AudioRuntimeController {
     await _sessionController!.runAdaptiveTest();
   }
 
-  Future<void> runLongRunStabilityTest() async {
+  Future<void> runLongRunStabilityTest({int? durationSeconds}) async {
     if (_sessionController == null) return;
-    await _sessionController!.runLongRunStabilityTest();
+    await _sessionController!.runLongRunStabilityTest(durationSeconds: durationSeconds);
   }
 
   void dispose() {

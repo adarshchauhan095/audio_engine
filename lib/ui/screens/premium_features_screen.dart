@@ -156,12 +156,16 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
                     ValueListenableBuilder<double>(
                       valueListenable: widget.runtime.frequency,
                       builder: (context, freq, _) {
+                        final double safeFreq = freq.clamp(
+                          AudioRuntimeController.freqMin,
+                          1000.0,
+                        );
                         return Row(
                           children: [
                             const Text('Base Frequency'),
                             Expanded(
                               child: Slider(
-                                value: freq,
+                                value: safeFreq,
                                 min: AudioRuntimeController.freqMin,
                                 max: 1000.0, // Limit for better binaural effect demo
                                 onChanged: (v) {

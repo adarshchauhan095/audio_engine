@@ -117,8 +117,10 @@ class TherapySessionController {
       
       if (startResult < 0) {
         debugPrint('TherapySessionController: engine.therapyStart returned error $startResult');
+      } else {
+        debugPrint('TherapySessionController: session started (${durationMinutes}min) sub=$subthreshold rmp=$rmp pip=$pip sidebands=$sidebands binaural=$binaural baseFreq=$baseFreq baseAmp=$baseAmp');
       }
-      
+
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(milliseconds: 200), _onTick);
   }
@@ -197,6 +199,8 @@ class TherapySessionController {
      int stopResult = engine.therapyStop();
      if (stopResult < 0) {
        debugPrint('TherapySessionController: engine.therapyStop returned error $stopResult');
+     } else {
+       debugPrint('TherapySessionController: session stopped');
      }
      // Opt to stop engine as well if Therapy takes full control
      if (engine.isRunning) {

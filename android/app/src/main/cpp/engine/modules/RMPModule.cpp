@@ -4,6 +4,12 @@ RMPModule::RMPModule() : rng_(std::random_device{}()) {}
 
 void RMPModule::init(double sampleRate) { sampleRate_ = sampleRate; }
 
+void RMPModule::reset() {
+  samplesUntilNextJitter_ = 0;
+  freqJitter_ = 0.0;
+  ampJitter_ = 0.0f;
+}
+
 float RMPModule::process(double baseFreq, float baseAmp, float rmpDepth,
                          float rmpRate) {
   if (samplesUntilNextJitter_ <= 0) {

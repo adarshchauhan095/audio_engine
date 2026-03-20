@@ -21,7 +21,9 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
   double _rmpDepth = 0.1;
   double _rmpRate = 5.0;
   double _pipInterval = 0.2;
+  double _pipDuration = 0.02;
   double _sidebandOffset = 100.0;
+  double _sidebandIntensity = 0.33;
   double _intensity = 0.5;
 
   bool _isDemoRunning = false;
@@ -44,9 +46,9 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
       rmpDepth: _rmpDepth,
       rmpRate: _rmpRate,
       pipInterval: _pipInterval,
-      pipDuration: 0.02, // Default small duration
+      pipDuration: _pipDuration,
       sidebandOffset: _sidebandOffset,
-      sidebandIntensity: 0.33,
+      sidebandIntensity: _sidebandIntensity,
       binauralOffset: 5.0,
     );
   }
@@ -71,9 +73,9 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
         rmpDepth: _rmpDepth,
         rmpRate: _rmpRate,
         pipInterval: _pipInterval,
-        pipDuration: 0.02,
+        pipDuration: _pipDuration,
         sidebandOffset: _sidebandOffset,
-        sidebandIntensity: 0.33,
+        sidebandIntensity: _sidebandIntensity,
         binauralOffset: 5.0,
       );
       if (!widget.runtime.playing.value) {
@@ -216,6 +218,21 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
                   _updateEngine();
                 },
               ),
+              Padding(
+                padding: const EdgeInsets.only(left: 16.0, top: 8.0),
+                child: Text('pipDuration: Tone burst length (${_pipDuration.toStringAsFixed(2)} s)'),
+              ),
+              Slider(
+                value: _pipDuration,
+                min: 0.01,
+                max: 0.2,
+                divisions: 19,
+                label: '${_pipDuration.toStringAsFixed(2)} s',
+                onChanged: (v) {
+                  setState(() => _pipDuration = v);
+                  _updateEngine();
+                },
+              ),
             ],
             const Divider(),
 
@@ -241,6 +258,21 @@ class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
                 label: '${_sidebandOffset.toStringAsFixed(0)} Hz',
                 onChanged: (v) {
                   setState(() => _sidebandOffset = v);
+                  _updateEngine();
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 16.0, top: 8.0),
+                child: Text('sidebandIntensity: Mix depth (${_sidebandIntensity.toStringAsFixed(2)})'),
+              ),
+              Slider(
+                value: _sidebandIntensity,
+                min: 0.0,
+                max: 1.0,
+                divisions: 100,
+                label: _sidebandIntensity.toStringAsFixed(2),
+                onChanged: (v) {
+                  setState(() => _sidebandIntensity = v);
                   _updateEngine();
                 },
               ),

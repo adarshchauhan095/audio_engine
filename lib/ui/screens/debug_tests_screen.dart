@@ -2,13 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../../session/audio_runtime_controller.dart';
 
-class DebugTestsScreen extends StatelessWidget {
+class DebugTestsScreen extends StatefulWidget {
   const DebugTestsScreen({super.key, required this.runtime});
 
   final AudioRuntimeController runtime;
 
   @override
+  State<DebugTestsScreen> createState() => _DebugTestsScreenState();
+}
+
+class _DebugTestsScreenState extends State<DebugTestsScreen> {
+  int _longRunDurationSeconds = 30;
+
+  static const List<int> _longRunDurations = [15, 30, 45, 60];
+
+  @override
   Widget build(BuildContext context) {
+    final runtime = widget.runtime;
     return Scaffold(
       appBar: AppBar(title: const Text('Debug Tests')),
       body: ValueListenableBuilder<bool>(
@@ -87,6 +97,26 @@ class DebugTestsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         const Text('Sequence, adaptive, and long-run checks.'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: <Widget>[
+                            const Text('Long-run duration: '),
+                            DropdownButton<int>(
+                              value: _longRunDurationSeconds,
+                              items: _longRunDurations.map((int s) {
+                                return DropdownMenuItem<int>(
+                                  value: s,
+                                  child: Text('$s s'),
+                                );
+                              }).toList(),
+                              onChanged: disabled
+                                  ? null
+                                  : (int? v) {
+                                      if (v != null) setState(() => _longRunDurationSeconds = v);
+                                    },
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 16),
                         Wrap(
                           spacing: 8,
@@ -114,7 +144,9 @@ class DebugTestsScreen extends StatelessWidget {
                               onPressed: disabled
                                   ? null
                                   : () => runtime.runExclusiveDebugAction(
-                                      runtime.runLongRunStabilityTest,
+                                      () => runtime.runLongRunStabilityTest(
+                                        durationSeconds: _longRunDurationSeconds,
+                                      ),
                                     ),
                               icon: const Icon(Icons.hourglass_bottom),
                               label: const Text('Long run stability test'),
@@ -144,7 +176,7 @@ class DebugTestsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         ValueListenableBuilder<double>(
-                          valueListenable: runtime.frequency,
+                          valueListenable: widget.runtime.frequency,
                           builder: (context, freq, _) {
                             final double secureFreq = freq.clamp(AudioRuntimeController.freqMin, AudioRuntimeController.freqMax);
                             return Column(
@@ -155,7 +187,7 @@ class DebugTestsScreen extends StatelessWidget {
                                   value: secureFreq,
                                   min: AudioRuntimeController.freqMin,
                                   max: AudioRuntimeController.freqMax,
-                                  onChanged: disabled ? null : (double value) => runtime.setFrequency(value),
+                                  onChanged: disabled ? null : (double value) => widget.runtime.setFrequency(value),
                                 ),
                               ],
                             );
@@ -163,7 +195,7 @@ class DebugTestsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         ValueListenableBuilder<double>(
-                          valueListenable: runtime.amplitude,
+                          valueListenable: widget.runtime.amplitude,
                           builder: (context, amp, _) {
                             final double secureAmp = amp.clamp(0.0, 1.0);
                             return Column(
@@ -174,7 +206,7 @@ class DebugTestsScreen extends StatelessWidget {
                                   value: secureAmp,
                                   min: 0.0,
                                   max: 1.0,
-                                  onChanged: disabled ? null : (double value) => runtime.setAmplitude(value),
+                                  onChanged: disabled ? null : (double value) => widget.runtime.setAmplitude(value),
                                 ),
                               ],
                             );

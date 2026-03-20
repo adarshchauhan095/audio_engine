@@ -2,6 +2,11 @@
 
 void PIPModule::init(double sampleRate) { sampleRate_ = sampleRate; }
 
+void PIPModule::reset() {
+  samplesUntilToggle_ = 0;
+  isSilent_ = false;
+}
+
 float PIPModule::process(double baseFreq, float baseAmp, float pipInterval,
                          float pipDuration) {
   if (samplesUntilToggle_ <= 0) {

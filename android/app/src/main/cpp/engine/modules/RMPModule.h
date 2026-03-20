@@ -8,6 +8,7 @@ class RMPModule {
 public:
   RMPModule();
   void init(double sampleRate);
+  void reset();
   float process(double baseFreq, float baseAmp, float rmpDepth, float rmpRate);
 
 private:

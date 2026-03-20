@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "TherapyConfig.h"
 #include "modules/SubthresholdModule.h"
 #include "modules/RMPModule.h"
@@ -17,7 +19,12 @@ public:
 
 private:
     TherapyConfig config_;
-    
+    std::atomic<bool> enableSubthreshold_{false};
+    std::atomic<bool> enableRMP_{false};
+    std::atomic<bool> enablePIP_{false};
+    std::atomic<bool> enableSidebands_{false};
+    std::atomic<bool> enableBinaural_{false};
+
     SubthresholdModule subthreshold_;
     RMPModule rmp_;
     PIPModule pip_;

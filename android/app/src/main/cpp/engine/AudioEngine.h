@@ -6,6 +6,10 @@
 #include <memory>
 #include <mutex>
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
 #include "EventScheduler.h"
 #include "ParameterSmoother.h"
 #include "TherapyRouter.h"
@@ -63,5 +67,10 @@ private:
   void log(const char *msg) {
     if (logCb_)
       logCb_(msg);
+#if defined(__ANDROID__)
+    else {
+      __android_log_print(ANDROID_LOG_INFO, "AudioEngine", "%s", msg);
+    }
+#endif
   }
 };

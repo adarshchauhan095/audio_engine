@@ -158,16 +158,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () {
                     final session = widget.runtime.therapySession;
                     if (session != null) {
+                        final baseFreq = preset.baseFreq ?? widget.runtime.frequency.value;
+                        final baseAmp = preset.baseAmp ?? widget.runtime.amplitude.value;
+                        if (preset.baseFreq != null) widget.runtime.setFrequency(preset.baseFreq!);
+                        if (preset.baseAmp != null) widget.runtime.setAmplitude(preset.baseAmp!);
                         session.startSession(
                           subthreshold: preset.subthreshold,
                           rmp: preset.rmp,
                           pip: preset.pip,
                           sidebands: preset.sidebands,
                           binaural: preset.binaural,
-                          baseFreq: widget.runtime.frequency.value,
-                          baseAmp: widget.runtime.amplitude.value,
+                          baseFreq: baseFreq,
+                          baseAmp: baseAmp,
                           maxIntensity: 0.5,
-                          durationMinutes: 5, // default to 5 minutes from ProfileScreen
+                          durationMinutes: 5,
+                          targetRmpDepth: preset.rmpDepth ?? 0.1,
+                          targetRmpRate: preset.rmpRate ?? 5.0,
+                          targetPipInterval: preset.pipInterval ?? 0.2,
+                          targetPipDuration: preset.pipDuration ?? 0.02,
+                          targetSidebandOffset: preset.sidebandOffset ?? 100.0,
+                          targetSidebandIntensity: preset.sidebandIntensity ?? 0.33,
+                          targetBinauralOffset: preset.binauralOffset ?? 5.0,
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Started session: ${preset.name}')),
