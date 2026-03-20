@@ -17,6 +17,78 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
   int _selectedDurationMinutes = 5;
   double _intensity = 0.5;
 
+  // Editable parameters (user-customizable).
+  // Initialized from the selected preset, then updated by the UI controls.
+  double _baseFreq = TherapyProfilePreset.presets.first.baseFreq ?? 1000.0;
+  double _baseAmp = TherapyProfilePreset.presets.first.baseAmp ?? 0.2;
+
+  bool _subthreshold = TherapyProfilePreset.presets.first.subthreshold;
+  bool _rmp = TherapyProfilePreset.presets.first.rmp;
+  bool _pip = TherapyProfilePreset.presets.first.pip;
+  bool _sss = TherapyProfilePreset.presets.first.sidebands;
+  bool _binaural = TherapyProfilePreset.presets.first.binaural;
+
+  // Engine shaping parameters (kept preset-derived for now).
+  double _rmpDepth = TherapyProfilePreset.presets.first.rmpDepth ?? 0.1;
+  double _rmpRate = TherapyProfilePreset.presets.first.rmpRate ?? 5.0;
+  double _pipInterval = TherapyProfilePreset.presets.first.pipInterval ?? 0.2;
+  double _pipDuration = TherapyProfilePreset.presets.first.pipDuration ?? 0.02;
+  double _sidebandOffset = TherapyProfilePreset.presets.first.sidebandOffset ?? 100.0;
+  double _sidebandIntensity =
+      TherapyProfilePreset.presets.first.sidebandIntensity ?? 0.33;
+  double _binauralOffset =
+      TherapyProfilePreset.presets.first.binauralOffset ?? 5.0;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = _selectedPreset;
+    if (p == null) return;
+    _syncFromPreset(p);
+  }
+
+  void _syncFromPreset(TherapyProfilePreset p) {
+    _baseFreq = p.baseFreq ?? widget.runtime.frequency.value;
+    _baseAmp = p.baseAmp ?? widget.runtime.amplitude.value;
+
+    _subthreshold = p.subthreshold;
+    _rmp = p.rmp;
+    _pip = p.pip;
+    _sss = p.sidebands;
+    _binaural = p.binaural;
+
+    _rmpDepth = p.rmpDepth ?? _rmpDepth;
+    _rmpRate = p.rmpRate ?? _rmpRate;
+    _pipInterval = p.pipInterval ?? _pipInterval;
+    _pipDuration = p.pipDuration ?? _pipDuration;
+    _sidebandOffset = p.sidebandOffset ?? _sidebandOffset;
+    _sidebandIntensity = p.sidebandIntensity ?? _sidebandIntensity;
+    _binauralOffset = p.binauralOffset ?? _binauralOffset;
+  }
+
+  void _pushEditablePresetToEngine({
+    required TherapySessionController session,
+    required bool isRunning,
+  }) {
+    if (!isRunning) return;
+    session.updatePreset(
+      subthreshold: _subthreshold,
+      rmp: _rmp,
+      pip: _pip,
+      sidebands: _sss,
+      binaural: _binaural,
+      baseFreq: _baseFreq,
+      baseAmp: _baseAmp,
+      targetRmpDepth: _rmpDepth,
+      targetRmpRate: _rmpRate,
+      targetPipInterval: _pipInterval,
+      targetPipDuration: _pipDuration,
+      targetSidebandOffset: _sidebandOffset,
+      targetSidebandIntensity: _sidebandIntensity,
+      targetBinauralOffset: _binauralOffset,
+    );
+  }
+
   void _logPresetConfiguration(TherapyProfilePreset p) {
     debugPrint('Preset loaded: ${p.name}');
 
@@ -78,35 +150,19 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                   onChanged: (v) {
                     if (v == null) return;
 
-                    setState(() => _selectedPreset = v);
-
-                    final double baseFreq = v.baseFreq ?? runtime.frequency.value;
-                    final double baseAmp = v.baseAmp ?? runtime.amplitude.value;
-
-                    // Keep the "Live Audio Settings" card consistent with the preset.
-                    if (v.baseFreq != null) runtime.setFrequency(v.baseFreq!);
-                    if (v.baseAmp != null) runtime.setAmplitude(v.baseAmp!);
+                    setState(() {
+                      _selectedPreset = v;
+                      _syncFromPreset(v);
+                      // Keep the "Live Audio Settings" card consistent with the preset.
+                      runtime.setFrequency(_baseFreq);
+                      runtime.setAmplitude(_baseAmp);
+                    });
 
                     _logPresetConfiguration(v);
-
-                    if (isRunning) {
-                      session.updatePreset(
-                        subthreshold: v.subthreshold,
-                        rmp: v.rmp,
-                        pip: v.pip,
-                        sidebands: v.sidebands,
-                        binaural: v.binaural,
-                        baseFreq: baseFreq,
-                        baseAmp: baseAmp,
-                        targetRmpDepth: v.rmpDepth ?? 0.1,
-                        targetRmpRate: v.rmpRate ?? 5.0,
-                        targetPipInterval: v.pipInterval ?? 0.2,
-                        targetPipDuration: v.pipDuration ?? 0.02,
-                        targetSidebandOffset: v.sidebandOffset ?? 100.0,
-                        targetSidebandIntensity: v.sidebandIntensity ?? 0.33,
-                        targetBinauralOffset: v.binauralOffset ?? 5.0,
-                      );
-                    }
+                    _pushEditablePresetToEngine(
+                      session: session,
+                      isRunning: isRunning,
+                    );
                   },
                 ),
                 if (_selectedPreset != null)
@@ -126,46 +182,140 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                     elevation: 0,
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
-                      child: Builder(builder: (context) {
-                        final p = _selectedPreset!;
-                        final double baseFreq =
-                            p.baseFreq ?? runtime.frequency.value;
-                        final double baseAmp =
-                            p.baseAmp ?? runtime.amplitude.value;
-                        final double rmpDepth = p.rmpDepth ?? 0.1;
-                        final double rmpRate = p.rmpRate ?? 5.0;
-                        final double pipIntervalMs =
-                            (p.pipInterval ?? 0.2) * 1000.0;
-                        final double pipDurationMs =
-                            (p.pipDuration ?? 0.02) * 1000.0;
-                        final double sidebandOffset = p.sidebandOffset ?? 100.0;
-                        final double sidebandIntensity =
-                            p.sidebandIntensity ?? 0.33;
-                        final double binauralOffset =
-                            p.binauralOffset ?? 5.0;
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Preset Parameters',
-                                style: Theme.of(context).textTheme.titleSmall),
-                            const SizedBox(height: 8),
-                            Text('Base Freq: ${baseFreq.toStringAsFixed(0)} Hz'),
-                            Text('Base Amp: ${baseAmp.toStringAsFixed(3)}'),
-                            const SizedBox(height: 8),
-                            Text('Modules:'),
-                            Text('Subthreshold: ${p.subthreshold ? 'On' : 'Off'}'),
-                            Text('RMP: ${p.rmp ? 'On' : 'Off'}'
-                                '${p.rmp ? ' (rate=${rmpRate.toStringAsFixed(2)}, depth=${rmpDepth.toStringAsFixed(3)})' : ''}'),
-                            Text('PIP: ${p.pip ? 'On' : 'Off'}'
-                                '${p.pip ? ' (interval=${pipIntervalMs.toStringAsFixed(0)}ms, duration=${pipDurationMs.toStringAsFixed(0)}ms)' : ''}'),
-                            Text('SSS: ${p.sidebands ? 'On' : 'Off'}'
-                                '${p.sidebands ? ' (offset=${sidebandOffset.toStringAsFixed(1)}, intensity=${sidebandIntensity.toStringAsFixed(2)})' : ''}'),
-                            Text('Binaural: ${p.binaural ? 'On' : 'Off'}'
-                                '${p.binaural ? ' (offset=${binauralOffset.toStringAsFixed(1)} Hz)' : ''}'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Preset Parameters',
+                              style: Theme.of(context).textTheme.titleSmall),
+                          const SizedBox(height: 8),
+                          Text('Base Freq: ${_baseFreq.toStringAsFixed(0)} Hz'),
+                          Slider(
+                            value: _baseFreq,
+                            min: AudioRuntimeController.freqMin,
+                            max: AudioRuntimeController.freqMax,
+                            divisions: 199,
+                            onChanged: (v) {
+                              setState(() => _baseFreq = v);
+                              runtime.setFrequency(v);
+                              _pushEditablePresetToEngine(
+                                session: session,
+                                isRunning: isRunning,
+                              );
+                            },
+                          ),
+                          Text('Base Amp: ${_baseAmp.toStringAsFixed(3)}'),
+                          Slider(
+                            value: _baseAmp,
+                            min: 0.0,
+                            max: 1.0,
+                            divisions: 100,
+                            onChanged: (v) {
+                              setState(() => _baseAmp = v);
+                              runtime.setAmplitude(v);
+                              _pushEditablePresetToEngine(
+                                session: session,
+                                isRunning: isRunning,
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Modules:', style: Theme.of(context).textTheme.bodyMedium),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Text('Subthreshold'),
+                              const Spacer(),
+                              Switch(
+                                value: _subthreshold,
+                                onChanged: (v) {
+                                  setState(() => _subthreshold = v);
+                                  _pushEditablePresetToEngine(
+                                    session: session,
+                                    isRunning: isRunning,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Text('RMP'),
+                              const Spacer(),
+                              Switch(
+                                value: _rmp,
+                                onChanged: (v) {
+                                  setState(() => _rmp = v);
+                                  _pushEditablePresetToEngine(
+                                    session: session,
+                                    isRunning: isRunning,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Text('PIP'),
+                              const Spacer(),
+                              Switch(
+                                value: _pip,
+                                onChanged: (v) {
+                                  setState(() => _pip = v);
+                                  _pushEditablePresetToEngine(
+                                    session: session,
+                                    isRunning: isRunning,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Text('SSS'),
+                              const Spacer(),
+                              Switch(
+                                value: _sss,
+                                onChanged: (v) {
+                                  setState(() => _sss = v);
+                                  _pushEditablePresetToEngine(
+                                    session: session,
+                                    isRunning: isRunning,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Text('Binaural'),
+                              const Spacer(),
+                              Switch(
+                                value: _binaural,
+                                onChanged: (v) {
+                                  setState(() => _binaural = v);
+                                  _pushEditablePresetToEngine(
+                                    session: session,
+                                    isRunning: isRunning,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_rmp)
+                            Text(
+                              'RMP enabled (rate=${_rmpRate.toStringAsFixed(2)}, depth=${_rmpDepth.toStringAsFixed(3)})',
+                            ),
+                          if (_pip) ...[
+                            Text(
+                              'PIP interval updated to ${(_pipInterval * 1000.0).toStringAsFixed(0)} ms',
+                            ),
+                            Text(
+                              'PIP duration updated to ${(_pipDuration * 1000.0).toStringAsFixed(0)} ms',
+                            ),
                           ],
-                        );
-                      }),
+                        ],
+                      ),
                     ),
                   ),
                 const SizedBox(height: 16),
@@ -253,29 +403,28 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                     } else {
                       if (_selectedPreset == null) return;
                       final p = _selectedPreset!;
-                      final baseFreq = p.baseFreq ?? runtime.frequency.value;
-                      final baseAmp = p.baseAmp ?? runtime.amplitude.value;
-                      if (p.baseFreq != null) runtime.setFrequency(p.baseFreq!);
-                      if (p.baseAmp != null) runtime.setAmplitude(p.baseAmp!);
+                      // Ensure runtime "live settings" match the editable parameters.
+                      runtime.setFrequency(_baseFreq);
+                      runtime.setAmplitude(_baseAmp);
 
                       _logPresetConfiguration(p);
                       session.startSession(
-                        subthreshold: p.subthreshold,
-                        rmp: p.rmp,
-                        pip: p.pip,
-                        sidebands: p.sidebands,
-                        binaural: p.binaural,
-                        baseFreq: baseFreq,
-                        baseAmp: baseAmp,
+                        subthreshold: _subthreshold,
+                        rmp: _rmp,
+                        pip: _pip,
+                        sidebands: _sss,
+                        binaural: _binaural,
+                        baseFreq: _baseFreq,
+                        baseAmp: _baseAmp,
                         maxIntensity: _intensity,
                         durationMinutes: _selectedDurationMinutes,
-                        targetRmpDepth: p.rmpDepth ?? 0.1,
-                        targetRmpRate: p.rmpRate ?? 5.0,
-                        targetPipInterval: p.pipInterval ?? 0.2,
-                        targetPipDuration: p.pipDuration ?? 0.02,
-                        targetSidebandOffset: p.sidebandOffset ?? 100.0,
-                        targetSidebandIntensity: p.sidebandIntensity ?? 0.33,
-                        targetBinauralOffset: p.binauralOffset ?? 5.0,
+                        targetRmpDepth: _rmpDepth,
+                        targetRmpRate: _rmpRate,
+                        targetPipInterval: _pipInterval,
+                        targetPipDuration: _pipDuration,
+                        targetSidebandOffset: _sidebandOffset,
+                        targetSidebandIntensity: _sidebandIntensity,
+                        targetBinauralOffset: _binauralOffset,
                       );
                     }
                   },
