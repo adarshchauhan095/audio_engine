@@ -35,6 +35,16 @@ typedef LogCallbackC = Void Function(Pointer<Utf8>);
 typedef _RegisterLogC = Void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
 typedef _RegisterLogDart = void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
 
+typedef OutputLostCallbackC = Void Function();
+typedef _RegisterOutputLostC = Void Function(
+  NativeAudioHandle,
+  Pointer<NativeFunction<OutputLostCallbackC>>,
+);
+typedef _RegisterOutputLostDart = void Function(
+  NativeAudioHandle,
+  Pointer<NativeFunction<OutputLostCallbackC>>,
+);
+
 typedef _SetIntC = Void Function(NativeAudioHandle, Int32);
 typedef _SetIntDart = void Function(NativeAudioHandle, int);
 
@@ -54,6 +64,9 @@ class NativeBindings {
   late final _TherapyFuncDart _therapyUpdate;
   late final _TherapyStopFuncDart _therapyStop;
   late final _RegisterLogDart _registerLogCallback;
+  late final _RegisterOutputLostDart _registerOutputLostCallback;
+  late final _VoidNativeAudioHandleFuncDart _resetOutputStream;
+  late final _SetIntDart _setOutputDeviceId;
   late final _SetIntDart _setStereoEnabled;
 
   NativeBindings(DynamicLibrary lib) {
@@ -104,6 +117,17 @@ class NativeBindings {
           _TherapyStopFuncDart
         >('audio_therapy_stop');
     _registerLogCallback = lib.lookupFunction<_RegisterLogC, _RegisterLogDart>('audio_register_log_callback');
+    _registerOutputLostCallback = lib.lookupFunction<_RegisterOutputLostC, _RegisterOutputLostDart>(
+      'audio_register_output_lost_callback',
+    );
+    _resetOutputStream = lib
+        .lookupFunction<
+          _VoidNativeAudioHandleFuncC,
+          _VoidNativeAudioHandleFuncDart
+        >('audio_reset_output_stream');
+    _setOutputDeviceId = lib.lookupFunction<_SetIntC, _SetIntDart>(
+      'audio_set_output_device_id',
+    );
     _setStereoEnabled = lib.lookupFunction<_SetIntC, _SetIntDart>('audio_set_stereo_enabled');
   }
 
@@ -150,4 +174,15 @@ class NativeBindings {
   
   void registerLogCallback(NativeAudioHandle handle, Pointer<NativeFunction<LogCallbackC>> cb) =>
       _registerLogCallback(handle, cb);
+
+  void registerOutputLostCallback(
+    NativeAudioHandle handle,
+    Pointer<NativeFunction<OutputLostCallbackC>> cb,
+  ) =>
+      _registerOutputLostCallback(handle, cb);
+
+  void resetOutputStream(NativeAudioHandle handle) => _resetOutputStream(handle);
+
+  void setOutputDeviceId(NativeAudioHandle handle, int deviceId) =>
+      _setOutputDeviceId(handle, deviceId);
 }

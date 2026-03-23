@@ -358,7 +358,7 @@ class _SessionTemplateCard extends StatelessWidget {
                     label: const Text('End session'),
                   )
                 else
-                  FilledButton.icon(
+                  FilledButton.icon(q
                     onPressed: hasEngine && !otherSessionRunning
                         ? onStart
                         : null,

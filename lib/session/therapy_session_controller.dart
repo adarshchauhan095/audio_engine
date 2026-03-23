@@ -166,32 +166,68 @@ class TherapySessionController {
      }
      
      intensity.value = currentIntensity;
-     
-     // Dynamic Curves: rmpDepth and sidebandIntensity scale with the phase curve
-     double currentRmpDepth = targetRmpDepth * phaseRatio;
-     double currentSidebandIntensity = targetSidebandIntensity * phaseRatio;
-     
-     int updateResult = engine.therapyUpdate(
-        subthreshold: subthreshold,
-        rmp: rmp,
-        pip: pip,
-        sidebands: sidebands,
-        binaural: binaural,
-        intensity: currentIntensity,
-        baseFreq: baseFreq,
-        baseAmp: baseAmp,
-        rmpDepth: currentRmpDepth,
-        rmpRate: targetRmpRate,
-        pipInterval: targetPipInterval,
-        pipDuration: targetPipDuration,
-        sidebandOffset: targetSidebandOffset,
-        sidebandIntensity: currentSidebandIntensity,
-        binauralOffset: targetBinauralOffset,
+     _applyTherapyAudioUpdate();
+  }
+
+  /// After the native output stream was torn down and reopened (e.g. Bluetooth
+  /// disconnect), re-apply the current therapy DSP state without stopping the
+  /// session timer or phases.
+  void applyEngineOutputRecovery() {
+    if (_stopRequested || !isRunning.value) return;
+    if (!engine.isRunning) {
+      engine.start();
+    }
+    _applyTherapyAudioUpdate();
+  }
+
+  void _applyTherapyAudioUpdate() {
+    if (_endTime == null) return;
+
+    final DateTime now = DateTime.now();
+    int remain = _endTime!.difference(now).inSeconds;
+    if (remain <= 0) return;
+
+    final int elapsed =
+        (warmupDuration + mainDuration + cooldownDuration) - remain;
+    double phaseRatio = 0.0;
+    if (elapsed < warmupDuration) {
+      phaseRatio = warmupDuration > 0 ? elapsed / warmupDuration : 0.0;
+    } else if (elapsed - warmupDuration < mainDuration) {
+      phaseRatio = 1.0;
+    } else {
+      final int cooldownElapsed = elapsed - warmupDuration - mainDuration;
+      phaseRatio = cooldownDuration > 0
+          ? 1.0 - (cooldownElapsed / cooldownDuration)
+          : 0.0;
+    }
+
+    final double currentRmpDepth = targetRmpDepth * phaseRatio;
+    final double currentSidebandIntensity =
+        targetSidebandIntensity * phaseRatio;
+
+    final int updateResult = engine.therapyUpdate(
+      subthreshold: subthreshold,
+      rmp: rmp,
+      pip: pip,
+      sidebands: sidebands,
+      binaural: binaural,
+      intensity: intensity.value,
+      baseFreq: baseFreq,
+      baseAmp: baseAmp,
+      rmpDepth: currentRmpDepth,
+      rmpRate: targetRmpRate,
+      pipInterval: targetPipInterval,
+      pipDuration: targetPipDuration,
+      sidebandOffset: targetSidebandOffset,
+      sidebandIntensity: currentSidebandIntensity,
+      binauralOffset: targetBinauralOffset,
+    );
+
+    if (updateResult < 0) {
+      debugPrint(
+        'TherapySessionController: therapyUpdate (recovery) returned $updateResult',
       );
-      
-      if (updateResult < 0) {
-        debugPrint('TherapySessionController: engine.therapyUpdate returned error $updateResult');
-      }
+    }
   }
   
   void stopSession() {

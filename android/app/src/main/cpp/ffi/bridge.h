@@ -89,6 +89,15 @@ void audio_set_stereo_enabled(NativeAudioHandle handle, int enabled);
 
 void audio_register_log_callback(NativeAudioHandle handle, AudioLogCallback cb);
 
+typedef void (*AudioOutputLostCallback)(void);
+
+void audio_register_output_lost_callback(NativeAudioHandle handle,
+                                         AudioOutputLostCallback cb);
+
+void audio_reset_output_stream(NativeAudioHandle handle);
+
+void audio_set_output_device_id(NativeAudioHandle handle, int deviceId);
+
 /// Closes the extern "C" block.
 #ifdef __cplusplus
 }

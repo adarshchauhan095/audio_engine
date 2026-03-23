@@ -19,13 +19,21 @@
 ///
 /// Existing behavior is preserved for start/stop, amplitude, and
 /// frequency updates. New scheduler/session hooks are optional.
-class AudioEngine : public oboe::AudioStreamDataCallback {
+class AudioEngine : public oboe::AudioStreamDataCallback,
+                    public oboe::AudioStreamErrorCallback {
 public:
   ~AudioEngine();
 
   bool start();
   void stop();
   bool isRunning() const;
+
+  /// Fully closes the output stream (unlike [stop], which keeps the stream
+  /// open). Used after Bluetooth/route loss so the next [start] opens on the
+  /// current default device.
+  void resetOutputStream();
+
+  void setPreferredOutputDeviceId(int32_t deviceId);
 
   void setFrequency(float hz);
   void setTargetFrequency(double hz);
@@ -45,8 +53,15 @@ public:
   typedef void (*LogCallback)(const char *);
   void setLogCallback(LogCallback cb) { logCb_ = cb; }
 
-  oboe::DataCallbackResult onAudioReady(oboe::AudioStream *, void *audioData,
-                                        int32_t numFrames) override;
+  typedef void (*OutputLostCallback)();
+  void setOutputLostCallback(OutputLostCallback cb) { outputLostCb_ = cb; }
+
+  oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream,
+                                          void *audioData,
+                                          int32_t numFrames) override;
+
+  void onErrorBeforeClose(oboe::AudioStream *stream,
+                          oboe::Result error) override;
 
 private:
   std::mutex mutex_;
@@ -62,7 +77,9 @@ private:
   std::atomic<double> currentFreq_{440.0};
   std::atomic<bool> stereoEnabled_{true};
   std::atomic<bool> running_{false};
+  std::atomic<int32_t> preferredDeviceId_{-1};
   LogCallback logCb_ = nullptr;
+  OutputLostCallback outputLostCb_ = nullptr;
 
   void log(const char *msg) {
     if (logCb_)

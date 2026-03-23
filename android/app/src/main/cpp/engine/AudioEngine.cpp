@@ -10,10 +10,47 @@ constexpr float kTransportRampMs = 20.0f;
 
 AudioEngine::~AudioEngine() {
   std::lock_guard<std::mutex> lock(mutex_);
+  outputLostCb_ = nullptr;
   if (stream_) {
     stream_->requestStop();
     stream_->close();
     stream_.reset();
+  }
+}
+
+void AudioEngine::resetOutputStream() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  running_.store(false, std::memory_order_relaxed);
+  if (stream_) {
+    transportSmoother_.setTarget(0.0f);
+    stream_->requestStop();
+    stream_->close();
+    stream_.reset();
+#ifndef NDEBUG
+    log("Output stream reset for route recovery");
+#endif
+  }
+}
+
+void AudioEngine::setPreferredOutputDeviceId(int32_t deviceId) {
+  preferredDeviceId_.store(deviceId, std::memory_order_relaxed);
+}
+
+void AudioEngine::onErrorBeforeClose(oboe::AudioStream *stream,
+                                     oboe::Result error) {
+#ifndef NDEBUG
+  log("Oboe stream error; releasing stream handle");
+#endif
+  (void)error;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stream_.get() == stream) {
+      stream_.reset();
+    }
+    running_.store(false, std::memory_order_relaxed);
+  }
+  if (outputLostCb_) {
+    outputLostCb_();
   }
 }
 
@@ -37,7 +74,17 @@ bool AudioEngine::start() {
       ->setFormat(oboe::AudioFormat::Float)
       ->setChannelCount(2)
       ->setSampleRate(48000)
-      ->setDataCallback(this);
+#if defined(__ANDROID__)
+      ->setUsage(oboe::Usage::Media)
+      ->setContentType(oboe::ContentType::Music)
+#endif
+      ->setDataCallback(this)
+      ->setErrorCallback(this);
+
+  const int32_t devId = preferredDeviceId_.load(std::memory_order_relaxed);
+  if (devId >= 0) {
+    builder.setDeviceId(devId);
+  }
 
   if (builder.openStream(stream_) != oboe::Result::OK) {
     return false;
@@ -59,6 +106,8 @@ bool AudioEngine::start() {
     stream_.reset();
     return false;
   }
+
+  preferredDeviceId_.store(-1, std::memory_order_relaxed);
 
   running_.store(true, std::memory_order_relaxed);
 #ifndef NDEBUG
@@ -138,31 +187,52 @@ int AudioEngine::therapyStop() {
   return 1;
 }
 
-oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *,
+oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream,
                                                    void *audioData,
                                                    int32_t numFrames) {
   float *out = static_cast<float *>(audioData);
   bool isStereo = stereoEnabled_.load(std::memory_order_relaxed);
 
+  int32_t channelCount = 2;
+  if (audioStream != nullptr) {
+    channelCount = audioStream->getChannelCount();
+    if (channelCount < 1) {
+      channelCount = 1;
+    }
+  }
+
   for (int32_t i = 0; i < numFrames; ++i) {
     const float transport = transportSmoother_.process();
     const float amp = amplitudeSmoother_.process();
 
+    float left = 0.0f;
+    float right = 0.0f;
+
     if (therapyRouter_.isActive()) {
       StereoSample sr = therapyRouter_.process();
       if (!isStereo) {
-        float mono = (sr.left + sr.right) * 0.5f;
+        const float mono = (sr.left + sr.right) * 0.5f;
         sr.left = mono;
         sr.right = mono;
       }
-      out[i * 2] = sr.left * transport;
-      out[i * 2 + 1] = sr.right * transport;
-      // Keep voice manager processing silent to avoid it falling behind
+      left = sr.left * transport;
+      right = sr.right * transport;
       voiceManager_.process();
     } else {
-      float mono = transport * amp * voiceManager_.process();
-      out[i * 2] = mono;
-      out[i * 2 + 1] = mono;
+      const float mono = transport * amp * voiceManager_.process();
+      left = mono;
+      right = mono;
+    }
+
+    const size_t base = static_cast<size_t>(i) * static_cast<size_t>(channelCount);
+    if (channelCount == 1) {
+      out[base] = 0.5f * (left + right);
+    } else {
+      out[base + 0] = left;
+      out[base + 1] = right;
+      for (int32_t c = 2; c < channelCount; ++c) {
+        out[base + static_cast<size_t>(c)] = 0.5f * (left + right);
+      }
     }
   }
   return oboe::DataCallbackResult::Continue;

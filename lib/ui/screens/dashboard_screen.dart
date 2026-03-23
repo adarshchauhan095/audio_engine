@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../session/audio_runtime_controller.dart';
 import 'audio_control_screen.dart';
@@ -24,6 +25,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _runtime = AudioRuntimeController();
+    _runtime.attachRouteRecoveryChannel(
+      ServicesBinding.instance.defaultBinaryMessenger,
+    );
   }
 
   @override

@@ -38,6 +38,7 @@ dependencies:
   # Persistent local storage for detected tinnitus frequency (Milestone 03).
   shared_preferences: ^2.2.2
   ffi: ^2.2.0
+  audio_session: ^0.1.25
 
 dev_dependencies:
   flutter_test:

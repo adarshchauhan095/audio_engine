@@ -1,8 +1,30 @@
+import 'dart:io';
+
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 
 import 'ui/screens/dashboard_screen.dart';
 
-void main() {
+Future<void> _configureAndroidAudioSession() async {
+  if (!Platform.isAndroid) return;
+  final AudioSession session = await AudioSession.instance;
+  await session.configure(
+    const AudioSessionConfiguration(
+      androidAudioAttributes: AndroidAudioAttributes(
+        contentType: AndroidAudioContentType.music,
+        flags: AndroidAudioFlags.audibilityEnforced,
+        usage: AndroidAudioUsage.media,
+      ),
+      androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+      androidWillPauseWhenDucked: false,
+    ),
+  );
+  await session.setActive(true);
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await _configureAndroidAudioSession();
   runApp(const MyApp());
 }
 

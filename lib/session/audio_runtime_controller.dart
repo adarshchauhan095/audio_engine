@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
+import 'package:audio_session/audio_session.dart';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
@@ -65,6 +66,12 @@ class AudioRuntimeController {
   SessionController? _sessionController;
   TherapySessionController? _therapySessionController;
   NativeCallable<LogCallbackC>? _logCallable;
+  NativeCallable<OutputLostCallbackC>? _outputLostCallable;
+  MethodChannel? _routeChannel;
+  Timer? _routeRecoveryTimer;
+  bool _routeRecoveryAttached = false;
+
+  static const String _routeChannelName = 'com.audio.audio_engine/audio_route';
 
   final ValueNotifier<bool> _hasEngineNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<bool> stereoEnabled = ValueNotifier<bool>(true);
@@ -82,6 +89,7 @@ class AudioRuntimeController {
   static const double freqMin = 20.0;
   static const double freqMax = 20000.0;
   static const Duration _sessionTickInterval = Duration(milliseconds: 200);
+  static const Duration _routeRecoveryDebounce = Duration(milliseconds: 400);
 
   AudioEngine? get engine => _engine;
   TherapySessionController? get therapySession => _therapySessionController;
@@ -112,6 +120,101 @@ class AudioRuntimeController {
       _therapySessionController?.totalTherapySeconds.value = saved;
       _isRestoringTherapyAdherence = false;
     }();
+  }
+
+  /// Wires platform route notifications (e.g. Bluetooth output removed). Call
+  /// once from the root widget after [WidgetsFlutterBinding.ensureInitialized].
+  void attachRouteRecoveryChannel(BinaryMessenger messenger) {
+    if (!Platform.isAndroid || _disposed || _routeRecoveryAttached) return;
+    _routeRecoveryAttached = true;
+    _routeChannel = MethodChannel(
+      _routeChannelName,
+      const StandardMethodCodec(),
+      messenger,
+    );
+    _routeChannel!.setMethodCallHandler(_onRoutePlatformCall);
+  }
+
+  Future<void> _onRoutePlatformCall(MethodCall call) async {
+    if (call.method == 'onBluetoothAudioRouteLost') {
+      _scheduleAudioRouteRecovery();
+    }
+  }
+
+  void _onNativeOutputLost() {
+    _scheduleAudioRouteRecovery();
+  }
+
+  void _scheduleAudioRouteRecovery() {
+    if (_disposed || _engine == null) return;
+    _routeRecoveryTimer?.cancel();
+    _routeRecoveryTimer = Timer(_routeRecoveryDebounce, () {
+      _routeRecoveryTimer = null;
+      unawaited(_recoverAudioOutputAfterRouteLoss());
+    });
+  }
+
+  Future<void> _recoverAudioOutputAfterRouteLoss() async {
+    if (_disposed || _engine == null) return;
+
+    final bool therapyRunning =
+        _therapySessionController?.isRunning.value ?? false;
+    final bool wantsSound = playing.value ||
+        therapyRunning ||
+        profileSessionRunning.value ||
+        debugActionRunning.value ||
+        _engine!.isRunning;
+
+    try {
+      if (Platform.isAndroid) {
+        final AudioSession session = await AudioSession.instance;
+        await session.setActive(false);
+        await session.setActive(true);
+      }
+    } catch (e, st) {
+      debugPrint('Audio route recovery: session re-activate failed: $e $st');
+    }
+
+    int deviceId = -1;
+    if (_routeChannel != null) {
+      try {
+        final Object? raw = await _routeChannel!.invokeMethod<Object?>(
+          'getPreferredMusicOutputDeviceId',
+        );
+        if (raw is int) {
+          deviceId = raw;
+        } else if (raw is num) {
+          deviceId = raw.toInt();
+        }
+      } catch (e) {
+        debugPrint('Audio route recovery: device id query failed: $e');
+      }
+    }
+
+    if (deviceId >= 0) {
+      _engine!.setPreferredOutputDeviceId(deviceId);
+    }
+
+    _engine!.resetOutputStream();
+
+    if (!wantsSound) {
+      if (playing.value && !_engine!.isRunning) {
+        playing.value = false;
+      }
+      return;
+    }
+
+    final bool ok = _engine!.start();
+    if (!ok) {
+      playing.value = false;
+      return;
+    }
+
+    playing.value = true;
+
+    if (therapyRunning) {
+      _therapySessionController?.applyEngineOutputRecovery();
+    }
   }
 
   void _initEngine() {
@@ -150,6 +253,10 @@ class AudioRuntimeController {
 
       _logCallable = NativeCallable<LogCallbackC>.listener(_logNativeMessage);
       _engine!.registerLogCallback(_logCallable!.nativeFunction);
+
+      _outputLostCallable =
+          NativeCallable<OutputLostCallbackC>.listener(_onNativeOutputLost);
+      _engine!.registerOutputLostCallback(_outputLostCallable!.nativeFunction);
     } catch (e) {
       error.value = 'Engine init failed: $e';
     }
@@ -363,7 +470,11 @@ class AudioRuntimeController {
 
   void dispose() {
     _disposed = true;
+    _routeRecoveryTimer?.cancel();
+    _routeChannel?.setMethodCallHandler(null);
+    _routeChannel = null;
     _logCallable?.close();
+    _outputLostCallable?.close();
     _therapyAdherenceDebounceTimer?.cancel();
     _therapySessionController
         ?.totalTherapySeconds

@@ -174,9 +174,33 @@ class AudioEngine implements AudioControl {
     _bindings.registerLogCallback(_handle!, cb);
   }
 
+  void registerOutputLostCallback(Pointer<NativeFunction<OutputLostCallbackC>> cb) {
+    if (_handle == null) return;
+    _bindings.registerOutputLostCallback(_handle!, cb);
+  }
+
+  void clearOutputLostCallback() {
+    if (_handle == null) return;
+    _bindings.registerOutputLostCallback(_handle!, Pointer.fromAddress(0));
+  }
+
+  /// Next [start] opens on this Android [AudioDeviceInfo] id; cleared after a
+  /// successful start. Use `-1` for system default routing.
+  void setPreferredOutputDeviceId(int deviceId) {
+    if (_handle == null) return;
+    _bindings.setOutputDeviceId(_handle!, deviceId);
+  }
+
+  /// Closes the Oboe stream so the next [start] reopens on the current device.
+  void resetOutputStream() {
+    if (_handle == null) return;
+    _bindings.resetOutputStream(_handle!);
+  }
+
   /// Releases the native engine. Do not call other methods after this.
   void dispose() {
     if (_handle != null) {
+      clearOutputLostCallback();
       _bindings.destroy(_handle!);
       _handle = null;
     }

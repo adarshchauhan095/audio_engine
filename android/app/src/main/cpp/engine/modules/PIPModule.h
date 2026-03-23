@@ -9,7 +9,7 @@ public:
   void reset();
   float process(double baseFreq, float baseAmp, float pipInterval,
                 float pipDuration);
-
+q
 private:
   Oscillator mainOsc_;
   double sampleRate_ = 48000.0;

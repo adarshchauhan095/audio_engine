@@ -149,3 +149,17 @@ void audio_set_stereo_enabled(NativeAudioHandle h, int enabled) {
 void audio_register_log_callback(NativeAudioHandle h, AudioLogCallback cb) {
   static_cast<AudioEngine *>(h)->setLogCallback(cb);
 }
+
+void audio_register_output_lost_callback(NativeAudioHandle h,
+                                         AudioOutputLostCallback cb) {
+  static_cast<AudioEngine *>(h)->setOutputLostCallback(cb);
+}
+
+void audio_reset_output_stream(NativeAudioHandle h) {
+  static_cast<AudioEngine *>(h)->resetOutputStream();
+}
+
+void audio_set_output_device_id(NativeAudioHandle h, int deviceId) {
+  static_cast<AudioEngine *>(h)->setPreferredOutputDeviceId(
+      static_cast<int32_t>(deviceId));
+}
