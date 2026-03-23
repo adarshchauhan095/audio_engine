@@ -3,13 +3,26 @@ import 'package:flutter/material.dart';
 import '../../session/audio_runtime_controller.dart';
 import '../tinnitus_detection_section.dart';
 
-class TinnitusDetectionScreen extends StatelessWidget {
+class TinnitusDetectionScreen extends StatefulWidget {
   const TinnitusDetectionScreen({super.key, required this.runtime});
 
   final AudioRuntimeController runtime;
 
   @override
+  State<TinnitusDetectionScreen> createState() =>
+      _TinnitusDetectionScreenState();
+}
+
+class _TinnitusDetectionScreenState extends State<TinnitusDetectionScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.runtime.prepareForTinnitusDetection();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final AudioRuntimeController runtime = widget.runtime;
     return Scaffold(
       appBar: AppBar(title: const Text('Tinnitus Detection')),
       body: SingleChildScrollView(
@@ -28,7 +41,7 @@ class TinnitusDetectionScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            TinnitusDetectionSection(engine: runtime.engine),
+            TinnitusDetectionSection(runtime: runtime),
             const SizedBox(height: 88),
           ],
         ),

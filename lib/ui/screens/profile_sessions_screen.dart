@@ -26,6 +26,7 @@ class _ProfileSessionsScreenState extends State<ProfileSessionsScreen> {
   @override
   void initState() {
     super.initState();
+    widget.runtime.prepareForProfileSessionsWorkspace();
     _selectedProfile = ProfileSessionCatalog.profileExamples.first;
   }
 

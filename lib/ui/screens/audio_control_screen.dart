@@ -4,13 +4,25 @@ import '../../session/audio_runtime_controller.dart';
 import '../widgets/amplitude_slider.dart';
 import '../widgets/frequency_slider.dart';
 
-class AudioControlScreen extends StatelessWidget {
+class AudioControlScreen extends StatefulWidget {
   const AudioControlScreen({super.key, required this.runtime});
 
   final AudioRuntimeController runtime;
 
   @override
+  State<AudioControlScreen> createState() => _AudioControlScreenState();
+}
+
+class _AudioControlScreenState extends State<AudioControlScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.runtime.prepareForLiveToneControls();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final AudioRuntimeController runtime = widget.runtime;
     return Scaffold(
       appBar: AppBar(title: const Text('Audio Controls')),
       body: SingleChildScrollView(

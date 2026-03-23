@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../engine/audio_engine.dart';
+import '../session/audio_runtime_controller.dart';
 import '../storage/detected_frequency_storage.dart';
 
 /// Sweep speed presets (Hz per second).
@@ -19,10 +20,12 @@ enum SweepSpeed {
 ///
 /// Provides coarse and fine frequency search, sweep mode (up/down, adjustable
 /// speed, interruptible), and persistent save/load of detected frequency.
-/// All control goes through [engine]; does not modify native/FFI directly.
+/// Control goes through [runtime] when provided (keeps module state in sync),
+/// otherwise through [engine] (e.g. legacy [HomeScreen]).
 class TinnitusDetectionSection extends StatefulWidget {
-  const TinnitusDetectionSection({super.key, required this.engine});
+  const TinnitusDetectionSection({super.key, this.runtime, this.engine});
 
+  final AudioRuntimeController? runtime;
   final AudioEngine? engine;
 
   @override
@@ -45,11 +48,19 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
   Timer? _sweepTimer;
   static const int _sweepIntervalMs = 50;
 
+  AudioEngine? get _engine => widget.runtime?.engine ?? widget.engine;
+
   @override
   void initState() {
     super.initState();
     _detectionFrequency.addListener(_onDetectionFrequencyChanged);
     _loadSavedFrequency();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.runtime == null) return;
+      final AudioRuntimeController r = widget.runtime!;
+      _detectionFrequency.value = _clamp(r.frequency.value);
+      _amplitude.value = r.amplitude.value.clamp(0.0, 1.0);
+    });
   }
 
   @override
@@ -65,7 +76,11 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
 
   void _onDetectionFrequencyChanged() {
     final hz = _clamp(_detectionFrequency.value);
-    widget.engine?.setFrequency(hz);
+    if (widget.runtime != null) {
+      widget.runtime!.setFrequency(hz);
+    } else {
+      widget.engine?.setFrequency(hz);
+    }
   }
 
   Future<void> _loadSavedFrequency() async {
@@ -88,7 +103,7 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
   }
 
   void _startSweep(bool upward, SweepSpeed speed) {
-    if (widget.engine == null || _sweepActive) return;
+    if (_engine == null || _sweepActive) return;
     _sweepActive = true;
     _sweepProgress.value = 0.0;
     setState(() {});
@@ -112,7 +127,11 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
 
         if (next <= kMinFrequencyHz || next >= kMaxFrequencyHz) {
           _stopSweep();
-          widget.engine?.stop(); // Auto stop playback when detection sweep is completed
+          if (widget.runtime != null) {
+            widget.runtime!.stopPlayback();
+          } else {
+            _engine?.stop();
+          }
         }
       },
     );
@@ -146,7 +165,7 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
 
   @override
   Widget build(BuildContext context) {
-    final engine = widget.engine;
+    final AudioEngine? engine = _engine;
     return ExpansionTile(
       initiallyExpanded: true,
       title: const Text('Tinnitus frequency detection'),
@@ -213,7 +232,11 @@ class _TinnitusDetectionSectionState extends State<TinnitusDetectionSection> {
                         ? null
                         : (v) {
                             _amplitude.value = v;
-                            engine.setAmplitude(v);
+                            if (widget.runtime != null) {
+                              widget.runtime!.setAmplitude(v);
+                            } else {
+                              engine.setAmplitude(v);
+                            }
                           },
                   );
                 },

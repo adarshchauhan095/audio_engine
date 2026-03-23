@@ -17,6 +17,12 @@ class _DebugTestsScreenState extends State<DebugTestsScreen> {
   static const List<int> _longRunDurations = [15, 30, 45, 60];
 
   @override
+  void initState() {
+    super.initState();
+    widget.runtime.prepareForEngineExperiments();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final runtime = widget.runtime;
     return Scaffold(

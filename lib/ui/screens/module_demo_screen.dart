@@ -11,6 +11,12 @@ class ModuleDemoScreen extends StatefulWidget {
 }
 
 class _ModuleDemoScreenState extends State<ModuleDemoScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.runtime.prepareForEngineExperiments();
+  }
+
   // Module Toggles
   bool _enableSubthreshold = true;
   bool _enableRmp = false;

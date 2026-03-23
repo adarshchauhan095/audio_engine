@@ -11,6 +11,12 @@ class PremiumFeaturesScreen extends StatefulWidget {
 }
 
 class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.runtime.prepareForEngineExperiments();
+  }
+
   // Binaural Beats Controls
   bool _enableBinaural = false;
   double _binauralOffset = 10.0; // Default to Alpha/Low Beta

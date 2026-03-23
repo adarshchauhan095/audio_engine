@@ -21,6 +21,7 @@ class _SavedSessionParamsScreenState extends State<SavedSessionParamsScreen> {
   @override
   void initState() {
     super.initState();
+    widget.runtime.prepareForProfileSessionsWorkspace();
     _reload();
   }
 

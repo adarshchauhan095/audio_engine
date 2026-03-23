@@ -11,6 +11,7 @@ import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
 import '../models/session_params.dart';
 import '../storage/therapy_adherence_storage.dart';
+import 'profile_session_catalog.dart';
 import 'session_controller.dart';
 import 'therapy_session_controller.dart';
 
@@ -88,6 +89,12 @@ class AudioRuntimeController {
 
   static const double freqMin = 20.0;
   static const double freqMax = 20000.0;
+
+  /// Baseline tone for modules that use the raw oscillator (detection, audio
+  /// controls, debug, etc.). Matches initial engine defaults.
+  static const double moduleDefaultFrequencyHz = 440.0;
+  static const double moduleDefaultAmplitude = 0.3;
+
   static const Duration _sessionTickInterval = Duration(milliseconds: 200);
   static const Duration _routeRecoveryDebounce = Duration(milliseconds: 400);
 
@@ -227,8 +234,10 @@ class AudioRuntimeController {
       final DynamicLibrary lib = DynamicLibrary.open('libnative_audio.so');
       final NativeBindings bindings = NativeBindings(lib);
       _engine = AudioEngine(bindings)..init();
-      _engine!.setFrequency(frequency.value);
-      _engine!.setAmplitude(amplitude.value);
+      _engine!.setFrequency(moduleDefaultFrequencyHz);
+      _engine!.setAmplitude(moduleDefaultAmplitude);
+      frequency.value = moduleDefaultFrequencyHz;
+      amplitude.value = moduleDefaultAmplitude;
       _engine!.setStereoEnabled(stereoEnabled.value); // Initialize stereo state
       _sessionController = SessionController(
         engine: _engine!,
@@ -305,6 +314,60 @@ class AudioRuntimeController {
     final double clamped = amp.clamp(0.0, 1.0);
     _engine!.setAmplitude(clamped);
     amplitude.value = clamped;
+  }
+
+  /// Stops cross-module leakage: profile timers, adaptive therapy, native
+  /// therapy DSP, and simple-tone playback. Does not change stereo preference
+  /// or adherence totals.
+  void _prepareModuleBoundary() {
+    if (_engine == null || _disposed) return;
+    endRunningSession();
+    if (_therapySessionController?.isRunning.value ?? false) {
+      _therapySessionController!.stopSession();
+    } else {
+      _engine!.therapyStop();
+    }
+    if (playing.value) {
+      _engine!.stop();
+      playing.value = false;
+    }
+  }
+
+  /// Opening **Tinnitus Detection**: clean oscillator workspace.
+  void prepareForTinnitusDetection() {
+    _prepareModuleBoundary();
+    setFrequency(moduleDefaultFrequencyHz);
+    setAmplitude(moduleDefaultAmplitude);
+  }
+
+  /// Opening **Adaptive Therapy**: clear prior module state; idle tone matches
+  /// the first preset’s base parameters.
+  void prepareForAdaptiveTherapy() {
+    _prepareModuleBoundary();
+    final TherapyProfilePreset p = TherapyProfilePreset.presets.first;
+    setFrequency(p.baseFreq ?? 4000.0);
+    setAmplitude(p.baseAmp ?? 0.15);
+  }
+
+  /// Opening **Audio Controls**.
+  void prepareForLiveToneControls() {
+    _prepareModuleBoundary();
+    setFrequency(moduleDefaultFrequencyHz);
+    setAmplitude(moduleDefaultAmplitude);
+  }
+
+  /// Opening **Module Demo** or **Debug Tests**.
+  void prepareForEngineExperiments() {
+    _prepareModuleBoundary();
+    setFrequency(moduleDefaultFrequencyHz);
+    setAmplitude(moduleDefaultAmplitude);
+  }
+
+  /// Opening **Profile Sessions** (runs still apply their own [SessionParams]).
+  void prepareForProfileSessionsWorkspace() {
+    _prepareModuleBoundary();
+    setFrequency(moduleDefaultFrequencyHz);
+    setAmplitude(moduleDefaultAmplitude);
   }
 
   void applySessionParams(SessionParams params) {

@@ -42,6 +42,7 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
   @override
   void initState() {
     super.initState();
+    widget.runtime.prepareForAdaptiveTherapy();
     final p = _selectedPreset;
     if (p == null) return;
     _syncFromPreset(p);
