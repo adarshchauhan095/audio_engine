@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../engine/audio_engine.dart';
 import '../engine/bindings.dart';
 import '../models/session_params.dart';
+import '../storage/detected_frequency_storage.dart';
 import '../storage/therapy_adherence_storage.dart';
 import 'profile_session_catalog.dart';
 import 'session_controller.dart';
@@ -87,8 +88,8 @@ class AudioRuntimeController {
   final ValueNotifier<SessionRunSnapshot?> activeSession =
       ValueNotifier<SessionRunSnapshot?>(null);
 
-  static const double freqMin = 20.0;
-  static const double freqMax = 20000.0;
+  static const double freqMin = kMinFrequencyHz;
+  static const double freqMax = kMaxFrequencyHz;
 
   /// Baseline tone for modules that use the raw oscillator (detection, audio
   /// controls, debug, etc.). Matches initial engine defaults.
@@ -479,7 +480,7 @@ class AudioRuntimeController {
       debugProgress.value = (now.difference(start).inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
       
       final double f =
-          110.0 + (8000 - 110) * (now.millisecond % 1000 / 1000);
+          freqMin + (freqMax - freqMin) * (now.millisecond % 1000 / 1000);
       final double a = (now.millisecond % 1000) / 1000.0;
       _engine!.setFrequency(f);
       _engine!.setAmplitude(a);
@@ -507,8 +508,8 @@ class AudioRuntimeController {
 
   void runExtremeValues() {
     if (_engine == null) return;
-    _engine!.setFrequency(110);
-    _engine!.setFrequency(8000);
+    _engine!.setFrequency(freqMin);
+    _engine!.setFrequency(freqMax);
     _engine!.setAmplitude(0);
     _engine!.setAmplitude(1);
     frequency.value = freqMax;

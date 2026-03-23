@@ -63,9 +63,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             Text('Frequency: ${freq.toStringAsFixed(1)} Hz'),
                             Slider(
-                              value: freq,
-                              min: 20,
-                              max: 20000,
+                              value: freq.clamp(
+                                AudioRuntimeController.freqMin,
+                                AudioRuntimeController.freqMax,
+                              ),
+                              min: AudioRuntimeController.freqMin,
+                              max: AudioRuntimeController.freqMax,
                               onChanged: widget.runtime.setFrequency,
                             ),
                           ],

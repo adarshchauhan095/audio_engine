@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Valid frequency range for tinnitus detection (Hz). Used for validation before save.
 const double kMinFrequencyHz = 20.0;
-const double kMaxFrequencyHz = 8000.0;
+const double kMaxFrequencyHz = 14000.0;
 
 const String _kDetectedTinnitusFrequencyKey = 'detected_tinnitus_frequency';
 
