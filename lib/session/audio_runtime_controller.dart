@@ -130,8 +130,9 @@ class AudioRuntimeController {
     }();
   }
 
-  /// Wires platform route notifications (e.g. Bluetooth output removed). Call
-  /// once from the root widget after [WidgetsFlutterBinding.ensureInitialized].
+  /// Wires platform route notifications (preferred output added/removed, e.g.
+  /// Bluetooth or wired). Call once from the root widget after
+  /// [WidgetsFlutterBinding.ensureInitialized].
   void attachRouteRecoveryChannel(BinaryMessenger messenger) {
     if (!Platform.isAndroid || _disposed || _routeRecoveryAttached) return;
     _routeRecoveryAttached = true;
@@ -141,10 +142,34 @@ class AudioRuntimeController {
       messenger,
     );
     _routeChannel!.setMethodCallHandler(_onRoutePlatformCall);
+    unawaited(_primePreferredOutputDeviceFromPlatform());
+  }
+
+  /// Sets native preferred Oboe device from the platform list (e.g. BT already
+  /// connected at cold start) without reopening the stream.
+  Future<void> _primePreferredOutputDeviceFromPlatform() async {
+    if (_disposed || _engine == null || _routeChannel == null) return;
+    try {
+      final Object? raw = await _routeChannel!.invokeMethod<Object?>(
+        'getPreferredMusicOutputDeviceId',
+      );
+      int deviceId = -1;
+      if (raw is int) {
+        deviceId = raw;
+      } else if (raw is num) {
+        deviceId = raw.toInt();
+      }
+      if (deviceId >= 0) {
+        _engine!.setPreferredOutputDeviceId(deviceId);
+      }
+    } catch (e) {
+      debugPrint('Audio route: prime preferred device failed: $e');
+    }
   }
 
   Future<void> _onRoutePlatformCall(MethodCall call) async {
-    if (call.method == 'onBluetoothAudioRouteLost') {
+    if (call.method == 'onPreferredAudioOutputChanged' ||
+        call.method == 'onBluetoothAudioRouteLost') {
       _scheduleAudioRouteRecovery();
     }
   }
