@@ -1,13 +1,32 @@
 #include "RMPModule.h"
 
+#include <cmath>
+
+namespace {
+constexpr float kRmpAmpSmoothMs = 5.0f;
+
+float smoothingCoeffFromMs(float timeMs, double sampleRate) {
+  if (timeMs <= 0.0f || sampleRate <= 0.0) {
+    return 0.0f;
+  }
+  const float smoothingSamples =
+      (timeMs * 0.001f) * static_cast<float>(sampleRate);
+  return std::exp(-1.0f / smoothingSamples);
+}
+} // namespace
+
 RMPModule::RMPModule() : rng_(std::random_device{}()) {}
 
-void RMPModule::init(double sampleRate) { sampleRate_ = sampleRate; }
+void RMPModule::init(double sampleRate) {
+  sampleRate_ = sampleRate;
+  ampSmoothCoeff_ = smoothingCoeffFromMs(kRmpAmpSmoothMs, sampleRate_);
+}
 
 void RMPModule::reset() {
   samplesUntilNextJitter_ = 0;
   freqJitter_ = 0.0;
   ampJitter_ = 0.0f;
+  smoothedAmp_ = -1.0f;
 }
 
 float RMPModule::process(double baseFreq, float baseAmp, float rmpDepth,
@@ -34,11 +53,18 @@ float RMPModule::process(double baseFreq, float baseAmp, float rmpDepth,
   samplesUntilNextJitter_--;
 
   mainOsc_.setTargetFrequency(baseFreq + freqJitter_);
-  float currentAmp = baseAmp + (baseAmp * ampJitter_);
-  if (currentAmp < 0.0f)
-    currentAmp = 0.0f;
-  if (currentAmp > 1.0f)
-    currentAmp = 1.0f;
+  float targetAmp = baseAmp + (baseAmp * ampJitter_);
+  if (targetAmp < 0.0f)
+    targetAmp = 0.0f;
+  if (targetAmp > 1.0f)
+    targetAmp = 1.0f;
 
-  return mainOsc_.process() * currentAmp;
+  if (smoothedAmp_ < 0.0f) {
+    smoothedAmp_ = targetAmp;
+  } else {
+    smoothedAmp_ =
+        targetAmp + ampSmoothCoeff_ * (smoothedAmp_ - targetAmp);
+  }
+
+  return mainOsc_.process() * smoothedAmp_;
 }

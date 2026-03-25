@@ -15,4 +15,7 @@ private:
   double sampleRate_ = 48000.0;
   int samplesUntilToggle_ = 0;
   bool isSilent_ = false;
+  /// Smoothed 0..1 gate (avoids clicks at pulse boundaries).
+  float envelope_ = 0.0f;
+  float pipEnvCoeff_ = 0.0f;
 };

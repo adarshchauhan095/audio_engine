@@ -18,4 +18,7 @@ private:
   int samplesUntilNextJitter_ = 0;
   double freqJitter_ = 0.0;
   float ampJitter_ = 0.0f;
+  /// One-pole smoothing toward target amplitude (avoids clicks on jitter steps).
+  float smoothedAmp_ = -1.0f;
+  float ampSmoothCoeff_ = 0.0f;
 };
