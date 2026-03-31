@@ -9,6 +9,7 @@ import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'therapy_session_screen.dart';
 import 'tinnitus_detection_screen.dart';
+import 'ams_matching_screen.dart';
 import 'premium_features_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -68,6 +69,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Tinnitus Detection',
                 icon: Icons.hearing,
                 onTap: () => _pushScreen(context, TinnitusDetectionScreen(runtime: _runtime)),
+              ),
+              _ModuleCard(
+                title: 'AMS Matching',
+                icon: Icons.graphic_eq,
+                onTap: () => _pushScreen(context, AmsMatchingScreen(runtime: _runtime)),
               ),
               _ModuleCard(
                 title: 'Adaptive Therapy',

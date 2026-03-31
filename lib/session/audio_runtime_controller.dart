@@ -366,6 +366,14 @@ class AudioRuntimeController {
     setAmplitude(moduleDefaultAmplitude);
   }
 
+  /// Opening **Automated Matching System (AMS)**: isolated oscillator for guided
+  /// frequency matching (coarse → fine → validation). Same boundary as other modules.
+  void prepareForAmsMatching() {
+    _prepareModuleBoundary();
+    setFrequency(moduleDefaultFrequencyHz);
+    setAmplitude(moduleDefaultAmplitude);
+  }
+
   /// Opening **Adaptive Therapy**: clear prior module state; idle tone matches
   /// the first preset’s base parameters.
   void prepareForAdaptiveTherapy() {
