@@ -76,8 +76,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () => _pushScreen(context, AmsMatchingScreen(runtime: _runtime)),
               ),
               _ModuleCard(
-                title: 'Adaptive Therapy',
-                icon: Icons.healing,
+                title: 'Sound Support Session',
+                icon: Icons.surround_sound,
                 onTap: () => _pushScreen(context, TherapySessionScreen(runtime: _runtime)),
               ),
               _ModuleCard(

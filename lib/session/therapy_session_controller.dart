@@ -118,9 +118,13 @@ class TherapySessionController {
       );
       
       if (startResult < 0) {
-        debugPrint('TherapySessionController: engine.therapyStart returned error $startResult');
+        debugPrint('SupportSession: engine start returned error $startResult');
       } else {
-        debugPrint('TherapySessionController: session started (${durationMinutes}min) sub=$subthreshold rmp=$rmp pip=$pip sidebands=$sidebands binaural=$binaural baseFreq=$baseFreq baseAmp=$baseAmp');
+        debugPrint(
+          'SupportSession: session started (${durationMinutes}min) '
+          'sub=$subthreshold rmp=$rmp pip=$pip sidebands=$sidebands binaural=$binaural '
+          'baseFreq=$baseFreq baseAmp=$baseAmp',
+        );
       }
 
       _timer?.cancel();
@@ -225,7 +229,7 @@ class TherapySessionController {
 
     if (updateResult < 0) {
       debugPrint(
-        'TherapySessionController: therapyUpdate (recovery) returned $updateResult',
+        'SupportSession: engine update (recovery) returned $updateResult',
       );
     }
   }
@@ -242,9 +246,9 @@ class TherapySessionController {
 
      final int stopResult = engine.therapyStop();
      if (stopResult < 0) {
-       debugPrint('TherapySessionController: engine.therapyStop returned error $stopResult');
+       debugPrint('SupportSession: engine stop returned error $stopResult');
      }
-     debugPrint('TherapySessionController: session stopped');
+     debugPrint('SupportSession: session stopped');
   }
   
   /// Live-updates the current therapy configuration while a session

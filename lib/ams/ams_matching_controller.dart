@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../session/audio_runtime_controller.dart';
 import '../storage/ams_matching_storage.dart';
 import '../storage/detected_frequency_storage.dart';
+import '../storage/tinnitx_user_profile_storage.dart';
 
 /// Distinct AMS UI / engine states (one screen per phase after start).
 enum AmsPhase {
@@ -166,7 +167,19 @@ class AmsMatchingController extends ChangeNotifier {
   /// Writes the matched frequency to the app-wide detected frequency store.
   Future<bool> saveAndContinue() async {
     if (_finalHz == null) return false;
-    return DetectedFrequencyStorage.saveDetectedFrequency(_finalHz!);
+    final double hz = _finalHz!;
+    final bool ok = await DetectedFrequencyStorage.saveDetectedFrequency(hz);
+    if (!ok) return false;
+
+    // Keep the schema-aligned profile in sync with the latest AMS match.
+    const String userId = 'local_user';
+    final profile = await TinnitXUserProfileStorage.getOrCreateMinimal(
+      userId: userId,
+    );
+    await TinnitXUserProfileStorage.saveProfile(
+      profile.copyWith(tinnitusFrequency: hz),
+    );
+    return true;
   }
 
   /// Stops AMS tone when leaving the flow (does not alter other modules).

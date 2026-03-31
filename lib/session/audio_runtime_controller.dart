@@ -12,6 +12,7 @@ import '../engine/bindings.dart';
 import '../models/session_params.dart';
 import '../storage/detected_frequency_storage.dart';
 import '../storage/therapy_adherence_storage.dart';
+import '../storage/tinnitx_user_profile_storage.dart';
 import 'profile_session_catalog.dart';
 import 'session_controller.dart';
 import 'therapy_session_controller.dart';
@@ -285,6 +286,12 @@ class AudioRuntimeController {
       _therapySessionController!.totalTherapySeconds
           .addListener(_scheduleTherapyAdherenceSave);
       _restoreTherapyAdherence();
+
+      // Create or migrate a schema-aligned user profile from legacy values.
+      // This keeps terminology consistent as the project evolves.
+      unawaited(
+        TinnitXUserProfileStorage.migrateLegacyIfNeeded(userId: 'local_user'),
+      );
 
       _logCallable = NativeCallable<LogCallbackC>.listener(_logNativeMessage);
       _engine!.registerLogCallback(_logCallable!.nativeFunction);

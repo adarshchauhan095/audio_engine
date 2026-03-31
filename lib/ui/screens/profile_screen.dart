@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+
+import '../../models/tinnitx_user_profile.dart';
 import '../../session/audio_runtime_controller.dart';
 import '../../session/profile_session_catalog.dart';
+import '../../storage/tinnitx_user_profile_storage.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.runtime});
@@ -11,6 +14,95 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const String _userId = 'local_user';
+
+  late Future<TinnitXUserProfile> _profileFuture;
+
+  TinnitXUserProfile? _profile;
+  bool _profileSaving = false;
+
+  // Required fields (editable)
+  double _tinnitusLoudness = 5.0;
+  TinnitusCharacter _tinnitusCharacter = TinnitusCharacter.tonal;
+  Laterality _laterality = Laterality.unsure;
+
+  // Optional modifiers (Phase 2-ready, user-driven)
+  final TextEditingController _ageController = TextEditingController();
+  SubjectiveHearingProfile? _subjectiveHearingProfile;
+  SoundSensitivity? _soundSensitivity;
+  final TextEditingController _stressLevelController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _ageController.dispose();
+    _stressLevelController.dispose();
+    super.dispose();
+  }
+
+  Future<TinnitXUserProfile> _loadProfile() async {
+    await TinnitXUserProfileStorage.migrateLegacyIfNeeded(userId: _userId);
+    final TinnitXUserProfile p =
+        await TinnitXUserProfileStorage.getOrCreateMinimal(userId: _userId);
+    _applyProfileToForm(p);
+    return p;
+  }
+
+  void _applyProfileToForm(TinnitXUserProfile p) {
+    _profile = p;
+    _tinnitusLoudness = p.tinnitusLoudness;
+    _tinnitusCharacter = p.tinnitusCharacter;
+    _laterality = p.laterality;
+
+    _ageController.text = p.age?.toStringAsFixed(0) ?? '';
+    _subjectiveHearingProfile = p.subjectiveHearingProfile;
+    _soundSensitivity = p.soundSensitivity;
+    _stressLevelController.text = p.stressLevel?.toString() ?? '';
+    if (mounted) setState(() {});
+  }
+
+  double? _tryParseDouble(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    return double.tryParse(s);
+  }
+
+  Future<void> _saveProfileEdits() async {
+    if (_profileSaving) return;
+    final p = _profile;
+    if (p == null) return;
+
+    setState(() => _profileSaving = true);
+    try {
+      final double? age = _tryParseDouble(_ageController.text);
+      final double? stress = _tryParseDouble(_stressLevelController.text);
+
+      final updated = p.copyWith(
+        tinnitusLoudness: _tinnitusLoudness,
+        tinnitusCharacter: _tinnitusCharacter,
+        laterality: _laterality,
+        age: age,
+        subjectiveHearingProfile: _subjectiveHearingProfile,
+        soundSensitivity: _soundSensitivity,
+        stressLevel: stress,
+      );
+
+      await TinnitXUserProfileStorage.saveProfile(updated);
+      _applyProfileToForm(updated);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile saved')),
+      );
+    } finally {
+      if (mounted) setState(() => _profileSaving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,13 +112,216 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            FutureBuilder<TinnitXUserProfile>(
+              future: _profileFuture,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.only(bottom: 24),
+                    child: Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Loading profile...'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                if (snap.hasError) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Card(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'Profile load failed: ${snap.error}',
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                final p = snap.data;
+                if (p != null && _profile == null) {
+                  // Ensure form fields are initialized even if build occurs
+                  // before initState's async work finishes.
+                  _applyProfileToForm(p);
+                }
+
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'TinnitX Profile',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'These settings describe your sound profile and are used to personalize stimulus suggestions.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'tinnitus_frequency: ${(_profile?.tinnitusFrequency ?? 0).toStringAsFixed(1)} Hz',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'tinnitus_loudness: ${_tinnitusLoudness.toStringAsFixed(1)}',
+                        ),
+                        Slider(
+                          value: _tinnitusLoudness.clamp(0.0, 10.0),
+                          min: 0.0,
+                          max: 10.0,
+                          divisions: 100,
+                          onChanged: (v) => setState(() => _tinnitusLoudness = v),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<TinnitusCharacter>(
+                          value: _tinnitusCharacter,
+                          decoration:
+                              const InputDecoration(labelText: 'tinnitus_character'),
+                          items: TinnitusCharacter.values
+                              .map(
+                                (v) => DropdownMenuItem(
+                                  value: v,
+                                  child: Text(v.value),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setState(() => _tinnitusCharacter = v);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<Laterality>(
+                          value: _laterality,
+                          decoration:
+                              const InputDecoration(labelText: 'laterality'),
+                          items: Laterality.values
+                              .map(
+                                (v) => DropdownMenuItem(
+                                  value: v,
+                                  child: Text(v.value),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setState(() => _laterality = v);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: const Text('Optional modifiers'),
+                          children: [
+                            TextFormField(
+                              controller: _ageController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'age (years)',
+                                hintText: 'Optional',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<SubjectiveHearingProfile?>(
+                              value: _subjectiveHearingProfile,
+                              decoration: const InputDecoration(
+                                labelText: 'subjective_hearing_profile',
+                              ),
+                              items: <DropdownMenuItem<SubjectiveHearingProfile?>>[
+                                const DropdownMenuItem(
+                                  value: null,
+                                  child: Text('null'),
+                                ),
+                                ...SubjectiveHearingProfile.values.map(
+                                  (v) => DropdownMenuItem(
+                                    value: v,
+                                    child: Text(v.value),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (v) =>
+                                  setState(() => _subjectiveHearingProfile = v),
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<SoundSensitivity?>(
+                              value: _soundSensitivity,
+                              decoration: const InputDecoration(
+                                labelText: 'sound_sensitivity',
+                              ),
+                              items: <DropdownMenuItem<SoundSensitivity?>>[
+                                const DropdownMenuItem(
+                                  value: null,
+                                  child: Text('null'),
+                                ),
+                                ...SoundSensitivity.values.map(
+                                  (v) => DropdownMenuItem(
+                                    value: v,
+                                    child: Text(v.value),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (v) =>
+                                  setState(() => _soundSensitivity = v),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _stressLevelController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'stress_level (0–10)',
+                                hintText: 'Optional',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _profileSaving ? null : _saveProfileEdits,
+                          icon: _profileSaving
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.save),
+                          label: Text(_profileSaving ? 'Saving...' : 'Save profile'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
             // Progress Section
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    Text('Therapy Adherence', style: Theme.of(context).textTheme.titleLarge),
+                    Text('Support Adherence', style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 16),
                     ValueListenableBuilder<int>(
                       valueListenable: widget.runtime.therapySession!.totalTherapySeconds,

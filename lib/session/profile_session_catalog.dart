@@ -54,14 +54,14 @@ class TherapyProfilePreset {
   static const List<TherapyProfilePreset> presets = [
     TherapyProfilePreset(
       name: 'Basic',
-      description: 'Uses only basic sub-threshold noise to gently stimulate the auditory system.',
+      description: 'Uses basic sub-threshold noise for gentle sound-based support.',
       subthreshold: true,
       baseFreq: 4000.0,
       baseAmp: 0.15,
     ),
     TherapyProfilePreset(
       name: 'Standard',
-      description: 'Includes sub-threshold noise along with Random Modulation Piping (RMP) and Periodic Integration Pulses (PIP) for engaged therapy.',
+      description: 'Adds RMP and PIP patterns for structured sound-based support.',
       subthreshold: true,
       rmp: true,
       pip: true,
@@ -74,7 +74,7 @@ class TherapyProfilePreset {
     ),
     TherapyProfilePreset(
       name: 'Premium',
-      description: 'Full featured. Adds sideband harmonics and binaural beats for deep habituation therapy.',
+      description: 'Full featured. Adds sidebands and binaural patterns for advanced sound-based support.',
       subthreshold: true,
       rmp: true,
       pip: true,
