@@ -57,7 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Tinnitus Therapy Hub'),
+            title: const Text('TinnitX'),
           ),
           body: GridView.count(
             crossAxisCount: 2,
