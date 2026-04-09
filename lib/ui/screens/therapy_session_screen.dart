@@ -326,7 +326,7 @@ class _TherapySessionScreenState extends State<TherapySessionScreen> {
                     const Text('Duration (minutes):'),
                     DropdownButton<int>(
                       value: _selectedDurationMinutes,
-                      items: [1, 5, 10, 20].map((int value) {
+                      items: [1, 5, 10, 20, 30, 60].map((int value) {
                         return DropdownMenuItem<int>(
                           value: value,
                           child: Text(value.toString()),

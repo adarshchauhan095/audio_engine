@@ -90,6 +90,16 @@ class TherapyProfilePreset {
       sidebandIntensity: 0.35,
       binauralOffset: 6.0,
     ),
+    TherapyProfilePreset(
+      name: 'Sound Support Session',
+      description: 'Uses your saved AMS tinnitus frequency. Combine with selected modules for a personalized session.',
+      baseFreq: null,
+      subthreshold: true,
+      rmp: false,
+      pip: false,
+      sidebands: false,
+      binaural: false,
+    ),
   ];
 }
 

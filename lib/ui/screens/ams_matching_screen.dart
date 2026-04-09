@@ -75,6 +75,15 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Automated Matching System'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Restart',
+              onPressed: () {
+                _controller.resetPhase();
+              },
+            ),
+          ],
         ),
         body: ListenableBuilder(
           listenable: _controller,
@@ -121,6 +130,9 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
           primaryLabel: 'OK',
           onHigher: engineReady ? _controller.higher : null,
           onLower: engineReady ? _controller.lower : null,
+          onHigherSweepStart: engineReady ? _controller.startSweepingHigher : null,
+          onLowerSweepStart: engineReady ? _controller.startSweepingLower : null,
+          onSweepEnd: engineReady ? _controller.stopSweeping : null,
           onPrimary: engineReady
               ? () async {
                   await _controller.confirmCoarse();
@@ -141,6 +153,9 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
           primaryLabel: 'OK',
           onHigher: engineReady ? _controller.higher : null,
           onLower: engineReady ? _controller.lower : null,
+          onHigherSweepStart: engineReady ? _controller.startSweepingHigher : null,
+          onLowerSweepStart: engineReady ? _controller.startSweepingLower : null,
+          onSweepEnd: engineReady ? _controller.stopSweeping : null,
           onPrimary: engineReady
               ? () async {
                   await _controller.confirmFine();
@@ -161,6 +176,9 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
           primaryLabel: 'Confirm',
           onHigher: engineReady ? _controller.higher : null,
           onLower: engineReady ? _controller.lower : null,
+          onHigherSweepStart: engineReady ? _controller.startSweepingHigher : null,
+          onLowerSweepStart: engineReady ? _controller.startSweepingLower : null,
+          onSweepEnd: engineReady ? _controller.stopSweeping : null,
           onPrimary: engineReady
               ? () async {
                   await _controller.confirmValidation();
@@ -230,6 +248,9 @@ class _MatchingPane extends StatelessWidget {
     required this.primaryLabel,
     this.onHigher,
     this.onLower,
+    this.onHigherSweepStart,
+    this.onLowerSweepStart,
+    this.onSweepEnd,
     this.onPrimary,
   });
 
@@ -241,6 +262,9 @@ class _MatchingPane extends StatelessWidget {
   final String primaryLabel;
   final VoidCallback? onHigher;
   final VoidCallback? onLower;
+  final VoidCallback? onHigherSweepStart;
+  final VoidCallback? onLowerSweepStart;
+  final VoidCallback? onSweepEnd;
   final Future<void> Function()? onPrimary;
 
   @override
@@ -276,16 +300,28 @@ class _MatchingPane extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: OutlinedButton(
-                onPressed: onLower,
-                child: Text(lowerLabel),
+              child: GestureDetector(
+                onTap: onLower,
+                onLongPressStart: onLowerSweepStart == null ? null : (_) => onLowerSweepStart!(),
+                onLongPressEnd: onSweepEnd == null ? null : (_) => onSweepEnd!(),
+                onLongPressUp: onSweepEnd,
+                child: OutlinedButton(
+                  onPressed: onLower,
+                  child: Text(lowerLabel),
+                ),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: OutlinedButton(
-                onPressed: onHigher,
-                child: Text(higherLabel),
+              child: GestureDetector(
+                onTap: onHigher,
+                onLongPressStart: onHigherSweepStart == null ? null : (_) => onHigherSweepStart!(),
+                onLongPressEnd: onSweepEnd == null ? null : (_) => onSweepEnd!(),
+                onLongPressUp: onSweepEnd,
+                child: OutlinedButton(
+                  onPressed: onHigher,
+                  child: Text(higherLabel),
+                ),
               ),
             ),
           ],

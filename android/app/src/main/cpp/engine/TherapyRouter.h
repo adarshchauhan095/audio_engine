@@ -8,6 +8,7 @@
 #include "modules/PIPModule.h"
 #include "modules/SidebandModule.h"
 #include "modules/BinauralModule.h"
+#include "ParameterSmoother.h"
 
 class TherapyRouter {
 public:
@@ -18,6 +19,13 @@ public:
     StereoSample process();
 
 private:
+    float sampleRate_ = 48000.0f;
+    ParameterSmoother subthresholdGainSmoother_;
+    ParameterSmoother rmpGainSmoother_;
+    ParameterSmoother pipGainSmoother_;
+    ParameterSmoother sidebandsGainSmoother_;
+    ParameterSmoother binauralGainSmoother_;
+
     TherapyConfig config_;
     std::atomic<bool> enableSubthreshold_{false};
     std::atomic<bool> enableRMP_{false};
