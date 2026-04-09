@@ -21,6 +21,18 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
   late final AmsMatchingController _controller;
   bool _saving = false;
 
+  static String _formatHz(double hz) {
+    final int rounded = hz.round();
+    final String s = rounded.toString();
+    final StringBuffer out = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      final int remaining = s.length - i;
+      out.write(s[i]);
+      if (remaining > 1 && remaining % 3 == 1) out.write(',');
+    }
+    return '$out Hz';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -116,14 +128,15 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
                   await _controller.beginMatching();
                 }
               : null,
+          onCancel: () {
+            Navigator.of(context).pop();
+          },
         );
       case AmsPhase.coarse:
         return _MatchingPane(
           key: const ValueKey<String>('coarse'),
-          title: 'Coarse matching',
-          subtitle:
-              'Large steps (${AmsMatchingController.coarseStepHz.toStringAsFixed(0)} Hz). '
-              'Use Higher / Lower, then OK when the tone is close enough.',
+          title: 'Coarse Matching',
+          stepLabel: 'Step 1 of 3 – Find the closest',
           frequencyHz: _controller.currentHz,
           higherLabel: 'Higher',
           lowerLabel: 'Lower',
@@ -142,11 +155,8 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
       case AmsPhase.fine:
         return _MatchingPane(
           key: const ValueKey<String>('fine'),
-          title: 'Fine matching',
-          subtitle:
-              'Small steps (${AmsMatchingController.fineStepHz.toStringAsFixed(0)} Hz) '
-              'within ±${AmsMatchingController.fineBandHalfWidthHz.toStringAsFixed(0)} Hz '
-              'of your coarse pick.',
+          title: 'Fine Matching',
+          stepLabel: 'Step 2 of 3 – Refine the tone',
           frequencyHz: _controller.currentHz,
           higherLabel: 'Higher',
           lowerLabel: 'Lower',
@@ -166,10 +176,7 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
         return _MatchingPane(
           key: const ValueKey<String>('validation'),
           title: 'Validation',
-          subtitle:
-              'Micro steps (${AmsMatchingController.microStepHz.toStringAsFixed(0)} Hz) '
-              'within ±${AmsMatchingController.validationBandHalfWidthHz.toStringAsFixed(0)} Hz '
-              'of your fine pick. Press Confirm when ready.',
+          stepLabel: 'Step 3 of 3 – Final adjustment',
           frequencyHz: _controller.currentHz,
           higherLabel: 'Adjust Higher',
           lowerLabel: 'Adjust Lower',
@@ -191,6 +198,9 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
           key: const ValueKey<String>('result'),
           frequencyHz: hz ?? 0,
           onSave: hz != null && engineReady && !_saving ? _onSaveAndContinue : null,
+          onRepeat: () {
+            _controller.resetPhase();
+          },
           busy: _saving,
         );
     }
@@ -198,9 +208,10 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
 }
 
 class _StartPane extends StatelessWidget {
-  const _StartPane({super.key, this.onStart});
+  const _StartPane({super.key, this.onStart, this.onCancel});
 
   final Future<void> Function()? onStart;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -209,14 +220,20 @@ class _StartPane extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
+          'AMS Intro',
+          style: Theme.of(context).textTheme.labelLarge,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
           'Automated Matching System',
           style: Theme.of(context).textTheme.headlineSmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
         Text(
-          'We will find your tinnitus frequency in three steps.',
-          style: Theme.of(context).textTheme.bodyLarge,
+          'This adjustment finds the tone that matches your tinnitus.',
+          style: Theme.of(context).textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
         const Spacer(),
@@ -231,6 +248,14 @@ class _StartPane extends StatelessWidget {
             child: Text('Start Matching'),
           ),
         ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: onCancel,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Cancel'),
+          ),
+        ),
         const SizedBox(height: 24),
       ],
     );
@@ -241,7 +266,7 @@ class _MatchingPane extends StatelessWidget {
   const _MatchingPane({
     super.key,
     required this.title,
-    required this.subtitle,
+    required this.stepLabel,
     required this.frequencyHz,
     required this.higherLabel,
     required this.lowerLabel,
@@ -255,7 +280,7 @@ class _MatchingPane extends StatelessWidget {
   });
 
   final String title;
-  final String subtitle;
+  final String stepLabel;
   final double frequencyHz;
   final String higherLabel;
   final String lowerLabel;
@@ -269,56 +294,79 @@ class _MatchingPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color primary = Theme.of(context).colorScheme.primary;
+    const double visualMinHz = 1000;
+    const double visualMaxHz = 12000;
+    final double clampedHz = frequencyHz.clamp(visualMinHz, visualMaxHz);
+    final double sliderValue =
+        (clampedHz - visualMinHz) / (visualMaxHz - visualMinHz);
+
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Current tone',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${frequencyHz.toStringAsFixed(1)} Hz',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ],
-            ),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          stepLabel,
+          style: Theme.of(context).textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 28),
+        Text(
+          _AmsMatchingScreenState._formatHz(frequencyHz),
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: primary,
+              ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 22),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 6,
+            activeTrackColor: primary.withValues(alpha: 0.45),
+            inactiveTrackColor: Theme.of(context).colorScheme.outlineVariant,
+            thumbColor: primary,
+            overlayShape: SliderComponentShape.noOverlay,
+          ),
+          child: Slider(
+            value: sliderValue.isFinite ? sliderValue : 0,
+            min: 0,
+            max: 1,
+            onChanged: null, // visual only
           ),
         ),
-        const Spacer(),
+        const SizedBox(height: 22),
         Row(
           children: [
             Expanded(
               child: GestureDetector(
                 onTap: onLower,
-                onLongPressStart: onLowerSweepStart == null ? null : (_) => onLowerSweepStart!(),
+                onLongPressStart:
+                    onLowerSweepStart == null ? null : (_) => onLowerSweepStart!(),
                 onLongPressEnd: onSweepEnd == null ? null : (_) => onSweepEnd!(),
                 onLongPressUp: onSweepEnd,
-                child: OutlinedButton(
+                child: FilledButton.tonal(
                   onPressed: onLower,
                   child: Text(lowerLabel),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Expanded(
               child: GestureDetector(
                 onTap: onHigher,
-                onLongPressStart: onHigherSweepStart == null ? null : (_) => onHigherSweepStart!(),
+                onLongPressStart: onHigherSweepStart == null
+                    ? null
+                    : (_) => onHigherSweepStart!(),
                 onLongPressEnd: onSweepEnd == null ? null : (_) => onSweepEnd!(),
                 onLongPressUp: onSweepEnd,
-                child: OutlinedButton(
+                child: FilledButton.tonal(
                   onPressed: onHigher,
                   child: Text(higherLabel),
                 ),
@@ -326,7 +374,7 @@ class _MatchingPane extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         FilledButton(
           onPressed: onPrimary == null
               ? null
@@ -338,6 +386,7 @@ class _MatchingPane extends StatelessWidget {
             child: Text(primaryLabel),
           ),
         ),
+        const SizedBox(height: 8),
       ],
     );
   }
@@ -348,23 +397,41 @@ class _ResultPane extends StatelessWidget {
     super.key,
     required this.frequencyHz,
     this.onSave,
+    this.onRepeat,
     this.busy = false,
   });
 
   final double frequencyHz;
   final VoidCallback? onSave;
+  final VoidCallback? onRepeat;
   final bool busy;
 
   @override
   Widget build(BuildContext context) {
+    final Color primary = Theme.of(context).colorScheme.primary;
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Spacer(),
         Text(
-          'Your matched frequency is: ${frequencyHz.toStringAsFixed(1)} Hz',
+          'Matching Complete',
           style: Theme.of(context).textTheme.titleLarge,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Your matched frequency is',
+          style: Theme.of(context).textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _AmsMatchingScreenState._formatHz(frequencyHz),
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: primary,
+              ),
           textAlign: TextAlign.center,
         ),
         const Spacer(),
@@ -379,6 +446,14 @@ class _ResultPane extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Text('Save & Continue'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: busy ? null : onRepeat,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Repeat Matching'),
           ),
         ),
         const SizedBox(height: 24),
