@@ -76,7 +76,6 @@ class AudioRuntimeController {
 
   static const String _routeChannelName = 'com.audio.audio_engine/audio_route';
 
-  final ValueNotifier<bool> _hasEngineNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<bool> stereoEnabled = ValueNotifier<bool>(true);
 
   final ValueNotifier<bool> playing = ValueNotifier<bool>(false);
@@ -108,6 +107,7 @@ class AudioRuntimeController {
   Timer? _sessionTicker;
   bool _sessionCancelRequested = false;
   bool _disposed = false;
+  Future<void> _engineSerial = Future<void>.value();
 
   Timer? _therapyAdherenceDebounceTimer;
   bool _isRestoringTherapyAdherence = false;
@@ -199,56 +199,7 @@ class AudioRuntimeController {
         debugActionRunning.value ||
         _engine!.isRunning;
 
-    try {
-      if (Platform.isAndroid) {
-        final AudioSession session = await AudioSession.instance;
-        await session.setActive(false);
-        await session.setActive(true);
-      }
-    } catch (e, st) {
-      debugPrint('Audio route recovery: session re-activate failed: $e $st');
-    }
-
-    int deviceId = -1;
-    if (_routeChannel != null) {
-      try {
-        final Object? raw = await _routeChannel!.invokeMethod<Object?>(
-          'getPreferredMusicOutputDeviceId',
-        );
-        if (raw is int) {
-          deviceId = raw;
-        } else if (raw is num) {
-          deviceId = raw.toInt();
-        }
-      } catch (e) {
-        debugPrint('Audio route recovery: device id query failed: $e');
-      }
-    }
-
-    if (deviceId >= 0) {
-      _engine!.setPreferredOutputDeviceId(deviceId);
-    }
-
-    _engine!.resetOutputStream();
-
-    if (!wantsSound) {
-      if (playing.value && !_engine!.isRunning) {
-        playing.value = false;
-      }
-      return;
-    }
-
-    final bool ok = _engine!.start();
-    if (!ok) {
-      playing.value = false;
-      return;
-    }
-
-    playing.value = true;
-
-    if (therapyRunning) {
-      _therapySessionController?.applyEngineOutputRecovery();
-    }
+    await resetEngine(resumeIfNeeded: wantsSound, restoreTherapyState: therapyRunning);
   }
 
   void _initEngine() {
@@ -335,6 +286,82 @@ class AudioRuntimeController {
     playing.value = false;
   }
 
+  /// Deterministic engine reset:
+  /// - stops transport
+  /// - closes the output stream (forces next [start] to open on current route)
+  /// - optionally resumes playback if it was desired
+  ///
+  /// This is safe to call on Bluetooth connect/disconnect or module boundaries.
+  Future<void> resetEngine({
+    bool resumeIfNeeded = true,
+    bool restoreTherapyState = false,
+  }) {
+    return _enqueueEngineOp(() async {
+      if (_disposed || _engine == null) return;
+
+      // Snapshot desired state.
+      final bool wantsSound = resumeIfNeeded;
+      final double f = frequency.value.clamp(freqMin, freqMax);
+      final double a = amplitude.value.clamp(0.0, 1.0);
+      final bool stereo = stereoEnabled.value;
+
+      try {
+        if (Platform.isAndroid) {
+          final AudioSession session = await AudioSession.instance;
+          await session.setActive(false);
+          await session.setActive(true);
+        }
+      } catch (e, st) {
+        debugPrint('Engine reset: session re-activate failed: $e $st');
+      }
+
+      int deviceId = -1;
+      if (_routeChannel != null) {
+        try {
+          final Object? raw = await _routeChannel!.invokeMethod<Object?>(
+            'getPreferredMusicOutputDeviceId',
+          );
+          if (raw is int) {
+            deviceId = raw;
+          } else if (raw is num) {
+            deviceId = raw.toInt();
+          }
+        } catch (e) {
+          debugPrint('Engine reset: preferred device id query failed: $e');
+        }
+      }
+
+      // Stop + close stream (route-safe).
+      if (_engine!.isRunning) {
+        _engine!.stop();
+      }
+      _engine!.resetOutputStream();
+
+      // Re-apply parameters for deterministic restart.
+      _engine!.setStereoEnabled(stereo);
+      _engine!.setAmplitude(a);
+      _engine!.setFrequency(f);
+      frequency.value = f;
+      amplitude.value = a;
+
+      if (!wantsSound) {
+        if (playing.value) playing.value = false;
+        return;
+      }
+
+      if (deviceId >= 0) {
+        _engine!.setPreferredOutputDeviceId(deviceId);
+      }
+
+      final bool ok = _engine!.start();
+      playing.value = ok;
+
+      if (ok && restoreTherapyState) {
+        _therapySessionController?.applyEngineOutputRecovery();
+      }
+    });
+  }
+
   void setFrequency(double hz) {
     if (_engine == null) return;
     final double clamped = hz.clamp(freqMin, freqMax);
@@ -354,6 +381,10 @@ class AudioRuntimeController {
   /// or adherence totals.
   void _prepareModuleBoundary() {
     if (_engine == null || _disposed) return;
+    // If a route recovery is pending, cancel it: module boundaries should win.
+    _routeRecoveryTimer?.cancel();
+    _routeRecoveryTimer = null;
+
     endRunningSession();
     if (_therapySessionController?.isRunning.value ?? false) {
       _therapySessionController!.stopSession();
@@ -364,6 +395,9 @@ class AudioRuntimeController {
       _engine!.stop();
       playing.value = false;
     }
+    // Ensure the next module opens a fresh stream on the current route.
+    // This prevents cross-module state leakage and makes re-entry deterministic.
+    _engine!.resetOutputStream();
   }
 
   /// Opening **Tinnitus Detection**: clean oscillator workspace.
@@ -598,6 +632,13 @@ class AudioRuntimeController {
     debugProgress.dispose();
     profileSessionRunning.dispose();
     activeSession.dispose();
+  }
+
+  Future<void> _enqueueEngineOp(Future<void> Function() op) {
+    // Serialize potentially conflicting engine operations:
+    // route recovery, module boundaries, and explicit resets.
+    _engineSerial = _engineSerial.then((_) => op()).catchError((_) {});
+    return _engineSerial;
   }
 
   Future<bool> _runSingleSessionInternal(

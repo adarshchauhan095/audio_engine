@@ -5,7 +5,9 @@
 namespace {
 constexpr double kTwoPi = 6.28318530717958647692;
 constexpr double kSampleRate = 48000.0;
-constexpr double kFrequencySmoothingMs = 3.0;
+// Frequency smoothing to avoid clicks during step changes (e.g. AMS higher/lower).
+// Kept short to stay responsive while preventing discontinuities at high Hz.
+constexpr double kFrequencySmoothingMs = 20.0;
 
 double smoothingCoeffForMs(double timeMs, double sampleRate) {
   if (timeMs <= 0.0 || sampleRate <= 0.0) return 0.0;

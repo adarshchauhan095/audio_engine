@@ -1,5 +1,7 @@
 import 'dart:ffi';
 
+import 'package:flutter/foundation.dart';
+
 import 'audio_control.dart';
 import 'bindings.dart';
 import 'ffi_types.dart';
@@ -28,7 +30,7 @@ class AudioEngine implements AudioControl {
     if (_handle == null) return false;
     int result = _bindings.start(_handle!);
     if (result != 0) {
-      print("engine start failed");
+      debugPrint('Engine start failed (native returned $result)');
       return false;
     }
     return true;
