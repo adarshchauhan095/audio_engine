@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../ams/ams_matching_controller.dart';
 import '../../session/audio_runtime_controller.dart';
+import 'edge_detection/edge_detection_intro_screen.dart';
 
 /// Automated Matching System (AMS) — structural flow only (wireframe parity).
 ///
@@ -61,6 +62,17 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
             ),
           ),
         );
+        // Launch Edge Detection after AMS completes, then return to the caller
+        // as before. This preserves the existing navigation contract.
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EdgeDetectionIntroScreen(
+              runtime: widget.runtime,
+              amsFrequencyHz: _controller.finalFrequency,
+            ),
+          ),
+        );
+        if (!mounted) return;
         Navigator.of(context).pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
