@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../ams/ams_matching_controller.dart';
 import '../../session/audio_runtime_controller.dart';
-import 'edge_detection/edge_detection_intro_screen.dart';
 
 /// Automated Matching System (AMS) — structural flow only (wireframe parity).
 ///
@@ -21,6 +20,7 @@ class AmsMatchingScreen extends StatefulWidget {
 class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
   late final AmsMatchingController _controller;
   bool _saving = false;
+  bool _advancing = false;
 
   static String _formatHz(double hz) {
     final int rounded = hz.round();
@@ -32,6 +32,16 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
       if (remaining > 1 && remaining % 3 == 1) out.write(',');
     }
     return '$out Hz';
+  }
+
+  Future<void> _advanceOnce(Future<void> Function() action) async {
+    if (_advancing) return;
+    setState(() => _advancing = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _advancing = false);
+    }
   }
 
   @override
@@ -62,17 +72,7 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
             ),
           ),
         );
-        // Launch Edge Detection after AMS completes, then return to the caller
-        // as before. This preserves the existing navigation contract.
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => EdgeDetectionIntroScreen(
-              runtime: widget.runtime,
-              amsFrequencyHz: _controller.finalFrequency,
-            ),
-          ),
-        );
-        if (!mounted) return;
+        // Return to the caller (My Profile & Progress) after saving.
         Navigator.of(context).pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -158,9 +158,9 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
           onHigherSweepStart: engineReady ? _controller.startSweepingHigher : null,
           onLowerSweepStart: engineReady ? _controller.startSweepingLower : null,
           onSweepEnd: engineReady ? _controller.stopSweeping : null,
-          onPrimary: engineReady
+          onPrimary: engineReady && !_advancing
               ? () async {
-                  await _controller.confirmCoarse();
+                  await _advanceOnce(_controller.confirmCoarse);
                 }
               : null,
         );
@@ -178,29 +178,29 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
           onHigherSweepStart: engineReady ? _controller.startSweepingHigher : null,
           onLowerSweepStart: engineReady ? _controller.startSweepingLower : null,
           onSweepEnd: engineReady ? _controller.stopSweeping : null,
-          onPrimary: engineReady
+          onPrimary: engineReady && !_advancing
               ? () async {
-                  await _controller.confirmFine();
+                  await _advanceOnce(_controller.confirmFine);
                 }
               : null,
         );
       case AmsPhase.validation:
         return _MatchingPane(
           key: const ValueKey<String>('validation'),
-          title: 'Validation',
+          title: 'Micro Matching',
           stepLabel: 'Step 3 of 3 – Final adjustment',
           frequencyHz: _controller.currentHz,
-          higherLabel: 'Adjust Higher',
-          lowerLabel: 'Adjust Lower',
-          primaryLabel: 'Confirm',
+          higherLabel: 'Higher',
+          lowerLabel: 'Lower',
+          primaryLabel: 'OK',
           onHigher: engineReady ? _controller.higher : null,
           onLower: engineReady ? _controller.lower : null,
           onHigherSweepStart: engineReady ? _controller.startSweepingHigher : null,
           onLowerSweepStart: engineReady ? _controller.startSweepingLower : null,
           onSweepEnd: engineReady ? _controller.stopSweeping : null,
-          onPrimary: engineReady
+          onPrimary: engineReady && !_advancing
               ? () async {
-                  await _controller.confirmValidation();
+                  await _advanceOnce(_controller.confirmValidation);
                 }
               : null,
         );
@@ -265,7 +265,7 @@ class _StartPane extends StatelessWidget {
           onPressed: onCancel,
           child: const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Cancel'),
+            child: Text('X'),
           ),
         ),
         const SizedBox(height: 24),
@@ -433,13 +433,7 @@ class _ResultPane extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          'Your matched frequency is',
-          style: Theme.of(context).textTheme.bodyMedium,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 10),
-        Text(
-          _AmsMatchingScreenState._formatHz(frequencyHz),
+          'Your matched frequency is: ${_AmsMatchingScreenState._formatHz(frequencyHz)}',
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: primary,

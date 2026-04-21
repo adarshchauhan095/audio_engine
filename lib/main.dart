@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 
 import 'ui/screens/dashboard_screen.dart';
 
+final RouteObserver<PageRoute<dynamic>> routeObserver =
+    RouteObserver<PageRoute<dynamic>>();
+
 Future<void> _configureAndroidAudioSession() async {
   if (!Platform.isAndroid) return;
   final AudioSession session = await AudioSession.instance;
@@ -39,6 +42,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      navigatorObservers: [routeObserver],
       home: const DashboardScreen(),
     );
   }

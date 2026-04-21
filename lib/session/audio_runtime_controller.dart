@@ -257,12 +257,54 @@ class AudioRuntimeController {
 
   void _setEnginePlaying(bool isPlaying) {
     if (_engine == null) return;
+    // Keep the existing API synchronous for callers, but apply a short fade
+    // around transport transitions to reduce squeaks/clicks.
+    unawaited(_setEnginePlayingSmooth(isPlaying));
+  }
+
+  static const Duration _transportFade = Duration(milliseconds: 40);
+
+  Future<void> _setEnginePlayingSmooth(bool isPlaying) async {
+    if (_engine == null || _disposed) return;
+    final AudioEngine engine = _engine!;
+    final double targetAmp = amplitude.value.clamp(0.0, 1.0);
+
     if (isPlaying) {
-      _engine!.start();
-    } else {
-      _engine!.stop();
+      // Fade in: start transport at 0 then ramp to target amplitude.
+      engine.setAmplitude(0.0);
+      final bool ok = engine.start();
+      playing.value = ok;
+      if (!ok) return;
+      await _rampEngineAmplitude(engine, from: 0.0, to: targetAmp, duration: _transportFade);
+      // Ensure the engine target amplitude matches user setting.
+      engine.setAmplitude(targetAmp);
+      return;
     }
-    playing.value = isPlaying;
+
+    // Fade out: ramp to 0 then stop transport; preserve the user's amplitude.
+    await _rampEngineAmplitude(engine, from: targetAmp, to: 0.0, duration: _transportFade);
+    engine.setAmplitude(targetAmp);
+    engine.stop();
+    playing.value = false;
+  }
+
+  Future<void> _rampEngineAmplitude(
+    AudioEngine engine, {
+    required double from,
+    required double to,
+    required Duration duration,
+  }) async {
+    const int steps = 6;
+    final int stepMs = (duration.inMilliseconds / steps).clamp(1, 1000).toInt();
+    for (int i = 0; i <= steps; i++) {
+      if (_disposed) return;
+      final double t = i / steps;
+      final double v = from + (to - from) * t;
+      engine.setAmplitude(v.clamp(0.0, 1.0));
+      if (i < steps) {
+        await Future<void>.delayed(Duration(milliseconds: stepMs));
+      }
+    }
   }
 
   void togglePlay() {
@@ -282,8 +324,7 @@ class AudioRuntimeController {
 
   void stopPlayback() {
     if (_engine == null || !playing.value) return;
-    _engine!.stop();
-    playing.value = false;
+    _setEnginePlaying(false);
   }
 
   /// Deterministic engine reset:

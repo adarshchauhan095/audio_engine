@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../models/tinnitx_user_profile.dart';
+import '../../models/edge_detection_result.dart';
 import '../../session/audio_runtime_controller.dart';
 import '../../session/profile_session_catalog.dart';
+import '../../storage/detected_frequency_storage.dart';
+import '../../storage/edge_detection_storage.dart';
 import '../../storage/tinnitx_user_profile_storage.dart';
+import '../../main.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.runtime});
@@ -13,10 +17,12 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
   static const String _userId = 'local_user';
 
   late Future<TinnitXUserProfile> _profileFuture;
+  late Future<double?> _detectedFrequencyFuture;
+  late Future<EdgeDetectionResult?> _edgeDetectionFuture;
 
   TinnitXUserProfile? _profile;
   bool _profileSaving = false;
@@ -35,11 +41,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _reloadAll();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute<dynamic>) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  void _reloadAll() {
     _profileFuture = _loadProfile();
+    _detectedFrequencyFuture = DetectedFrequencyStorage.loadDetectedFrequency();
+    _edgeDetectionFuture = EdgeDetectionStorage.loadResult();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didPopNext() {
+    // Coming back to this screen: refresh saved HPE/AMS results.
+    _reloadAll();
   }
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _ageController.dispose();
     _stressLevelController.dispose();
     super.dispose();
@@ -106,12 +135,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Profile & Progress')),
+      appBar: AppBar(
+        title: const Text('My Profile & Progress'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: _reloadAll,
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Saved Matching Results',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    FutureBuilder<double?>(
+                      future: _detectedFrequencyFuture,
+                      builder: (context, snap) {
+                        final v = snap.data;
+                        final String text = v == null
+                            ? 'Detected frequency (local): —'
+                            : 'Detected frequency (local): ${v.toStringAsFixed(1)} Hz';
+                        return Text(text);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    FutureBuilder<EdgeDetectionResult?>(
+                      future: _edgeDetectionFuture,
+                      builder: (context, snap) {
+                        final r = snap.data;
+                        if (r == null) {
+                          return const Text('Hearing Profile Check: —');
+                        }
+                        final zone = r.edgeZoneFinal;
+                        return Text(
+                          'Hearing Profile Check range: '
+                          '${zone.lowHz.toStringAsFixed(0)}–${zone.highHz.toStringAsFixed(0)} Hz',
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             FutureBuilder<TinnitXUserProfile>(
               future: _profileFuture,
               builder: (context, snap) {
