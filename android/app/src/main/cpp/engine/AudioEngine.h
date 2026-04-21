@@ -78,6 +78,7 @@ private:
   std::atomic<bool> stereoEnabled_{true};
   std::atomic<bool> running_{false};
   std::atomic<int32_t> preferredDeviceId_{-1};
+  float therapyRouterSampleRate_ = 0.0f;
   LogCallback logCb_ = nullptr;
   OutputLostCallback outputLostCb_ = nullptr;
 

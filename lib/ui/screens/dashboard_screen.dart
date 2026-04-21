@@ -10,7 +10,7 @@ import 'settings_screen.dart';
 import 'therapy_session_screen.dart';
 import 'tinnitus_detection_screen.dart';
 import 'ams_matching_screen.dart';
-import 'hearing_profile_check_screen.dart';
+import 'hearing_threshold_check_screen.dart';
 import 'premium_features_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -81,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 icon: Icons.hearing,
                 onTap: () => _pushScreen(
                   context,
-                  HearingProfileCheckScreen(runtime: _runtime),
+                  HearingThresholdCheckScreen(runtime: _runtime),
                 ),
               ),
               _ModuleCard(

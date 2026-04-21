@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../models/tinnitx_user_profile.dart';
 import '../../models/edge_detection_result.dart';
+import '../../models/hearing_threshold_result.dart';
 import '../../session/audio_runtime_controller.dart';
 import '../../session/profile_session_catalog.dart';
 import '../../storage/detected_frequency_storage.dart';
 import '../../storage/edge_detection_storage.dart';
+import '../../storage/hearing_threshold_storage.dart';
 import '../../storage/tinnitx_user_profile_storage.dart';
 import '../../main.dart';
+import 'ams_matching_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.runtime});
@@ -23,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
   late Future<TinnitXUserProfile> _profileFuture;
   late Future<double?> _detectedFrequencyFuture;
   late Future<EdgeDetectionResult?> _edgeDetectionFuture;
+  late Future<HearingThresholdResult?> _thresholdFuture;
 
   TinnitXUserProfile? _profile;
   bool _profileSaving = false;
@@ -57,6 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     _profileFuture = _loadProfile();
     _detectedFrequencyFuture = DetectedFrequencyStorage.loadDetectedFrequency();
     _edgeDetectionFuture = EdgeDetectionStorage.loadResult();
+    _thresholdFuture = HearingThresholdStorage.loadResult();
     if (mounted) setState(() {});
   }
 
@@ -161,6 +166,20 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                AmsMatchingScreen(runtime: widget.runtime),
+                          ),
+                        );
+                        _reloadAll();
+                      },
+                      icon: const Icon(Icons.graphic_eq),
+                      label: const Text('Run AMS Matching'),
+                    ),
+                    const SizedBox(height: 12),
                     FutureBuilder<double?>(
                       future: _detectedFrequencyFuture,
                       builder: (context, snap) {
@@ -177,12 +196,28 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       builder: (context, snap) {
                         final r = snap.data;
                         if (r == null) {
-                          return const Text('Hearing Profile Check: —');
+                          return const SizedBox.shrink();
                         }
                         final zone = r.edgeZoneFinal;
                         return Text(
-                          'Hearing Profile Check range: '
+                          'Hearing Profile (legacy slider) range: '
                           '${zone.lowHz.toStringAsFixed(0)}–${zone.highHz.toStringAsFixed(0)} Hz',
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    FutureBuilder<HearingThresholdResult?>(
+                      future: _thresholdFuture,
+                      builder: (context, snap) {
+                        final r = snap.data;
+                        if (r == null) {
+                          return const Text('Hearing Profile (thresholds): —');
+                        }
+                        final measured = r.points
+                            .where((p) => p.thresholdGain01 != null)
+                            .length;
+                        return Text(
+                          'Hearing Profile (thresholds): $measured/${r.points.length} saved',
                         );
                       },
                     ),
@@ -275,7 +310,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<TinnitusCharacter>(
-                          value: _tinnitusCharacter,
+                          initialValue: _tinnitusCharacter,
                           decoration:
                               const InputDecoration(labelText: 'tinnitus_character'),
                           items: TinnitusCharacter.values
@@ -293,7 +328,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<Laterality>(
-                          value: _laterality,
+                          initialValue: _laterality,
                           decoration:
                               const InputDecoration(labelText: 'laterality'),
                           items: Laterality.values
@@ -324,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<SubjectiveHearingProfile?>(
-                              value: _subjectiveHearingProfile,
+                              initialValue: _subjectiveHearingProfile,
                               decoration: const InputDecoration(
                                 labelText: 'subjective_hearing_profile',
                               ),
@@ -345,7 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<SoundSensitivity?>(
-                              value: _soundSensitivity,
+                              initialValue: _soundSensitivity,
                               decoration: const InputDecoration(
                                 labelText: 'sound_sensitivity',
                               ),

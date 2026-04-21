@@ -33,8 +33,8 @@ class _HearingProfileCheckScreenState extends State<HearingProfileCheckScreen> {
     // 3) null (user must run AMS first)
     final profile =
         await TinnitXUserProfileStorage.getOrCreateMinimal(userId: _userId);
-    final double? fromProfile = profile.tinnitusFrequency;
-    if (fromProfile != null && fromProfile.isFinite && fromProfile > 0) {
+    final double fromProfile = profile.tinnitusFrequency;
+    if (fromProfile.isFinite && fromProfile > 0) {
       return fromProfile;
     }
 

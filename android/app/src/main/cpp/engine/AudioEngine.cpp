@@ -26,6 +26,7 @@ void AudioEngine::resetOutputStream() {
     stream_->requestStop();
     stream_->close();
     stream_.reset();
+    therapyRouterSampleRate_ = 0.0f;
 #ifndef NDEBUG
     log("Output stream reset for route recovery");
 #endif
@@ -161,11 +162,13 @@ void AudioEngine::setStereoEnabled(bool enabled) {
 
 int AudioEngine::therapyStart(const TherapyConfig &config) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!stream_) {
-    // init therapy router if needed
-    therapyRouter_.init(48000.0);
-  } else {
-    therapyRouter_.init(stream_->getSampleRate());
+  const float sr = stream_ ? static_cast<float>(stream_->getSampleRate()) : 48000.0f;
+  // IMPORTANT: Do not re-init the router on every start; that can introduce
+  // discontinuities (pops/squeaks) when the user toggles therapy rapidly.
+  // Only re-init if the sample rate changed or the stream was reopened.
+  if (therapyRouterSampleRate_ <= 0.0f || std::fabs(therapyRouterSampleRate_ - sr) > 1e-3f) {
+    therapyRouter_.init(sr);
+    therapyRouterSampleRate_ = sr;
   }
   therapyRouter_.updateConfig(config);
   log("Therapy started");

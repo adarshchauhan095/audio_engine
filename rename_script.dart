@@ -16,6 +16,7 @@ void main() {
 
       if (newContent != content) {
         file.writeAsStringSync(newContent);
+        // ignore: avoid_print
         print('Updated ${file.path}');
       }
     }
@@ -24,12 +25,14 @@ void main() {
   final cat = File('lib/session/patient_session_catalog.dart');
   if (cat.existsSync()) {
     cat.renameSync('lib/session/profile_session_catalog.dart');
+    // ignore: avoid_print
     print('Renamed catalog');
   }
 
   final screen = File('lib/ui/screens/patient_sessions_screen.dart');
   if (screen.existsSync()) {
     screen.renameSync('lib/ui/screens/profile_sessions_screen.dart');
+    // ignore: avoid_print
     print('Renamed screen');
   }
 }

@@ -38,4 +38,10 @@ private:
     PIPModule pip_;
     SidebandModule sidebands_;
     BinauralModule binaural_;
+
+    // Clickless PIP param-change handling:
+    // when interval/duration changes, fade PIP module to silence, reset its
+    // schedule, then fade back in.
+    bool pipResetPending_ = false;
+    bool pipTargetEnableAfterReset_ = false;
 };

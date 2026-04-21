@@ -101,6 +101,13 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
           title: const Text('Automated Matching System'),
           actions: [
             IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Close',
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Restart',
               onPressed: () {
@@ -140,9 +147,7 @@ class _AmsMatchingScreenState extends State<AmsMatchingScreen> {
                   await _controller.beginMatching();
                 }
               : null,
-          onCancel: () {
-            Navigator.of(context).pop();
-          },
+          onCancel: () => Navigator.of(context).pop(),
         );
       case AmsPhase.coarse:
         return _MatchingPane(
@@ -258,14 +263,6 @@ class _StartPane extends StatelessWidget {
           child: const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Text('Start Matching'),
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: onCancel,
-          child: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('X'),
           ),
         ),
         const SizedBox(height: 24),

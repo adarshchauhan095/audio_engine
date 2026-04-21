@@ -34,25 +34,34 @@ void TherapyRouter::updateConfig(const TherapyConfig &config) {
 
   subthresholdGainSmoother_.setTarget(config_.enableSubthreshold ? 1.0f : 0.0f);
   rmpGainSmoother_.setTarget(config_.enableRMP ? 1.0f : 0.0f);
-  pipGainSmoother_.setTarget(config_.enablePIP ? 1.0f : 0.0f);
   sidebandsGainSmoother_.setTarget(config_.enableSidebands ? 1.0f : 0.0f);
   binauralGainSmoother_.setTarget(config_.enableBinaural ? 1.0f : 0.0f);
+
+  // PIP gain is special-cased to allow clickless resets on parameter changes.
+  // Default: follow enabled state.
+  if (!pipResetPending_) {
+    pipGainSmoother_.setTarget(config_.enablePIP ? 1.0f : 0.0f);
+  }
 
   const bool nowActive = isActive();
   if (wasActive && !nowActive) {
     rmp_.reset();
     pip_.reset();
+    pipResetPending_ = false;
+    pipTargetEnableAfterReset_ = false;
   }
 
-  // If PIP parameters change while PIP stays enabled, reset so the new
-  // interval/duration schedule takes effect immediately.
+  // If PIP parameters change while PIP is enabled, schedule a clickless reset:
+  // fade PIP to silence, reset, then fade back in.
   if (enablePIP_.load(std::memory_order_acquire)) {
-    const float intervalChanged =
+    const bool intervalChanged =
         std::fabs(prev.pipInterval - config_.pipInterval) > 1e-6f;
-    const float durationChanged =
+    const bool durationChanged =
         std::fabs(prev.pipDuration - config_.pipDuration) > 1e-6f;
-    if (intervalChanged || durationChanged) {
-      pip_.reset();
+    if ((intervalChanged || durationChanged) && !pipResetPending_) {
+      pipResetPending_ = true;
+      pipTargetEnableAfterReset_ = true;
+      pipGainSmoother_.setTarget(0.0f);
     }
   }
 }
@@ -69,6 +78,18 @@ StereoSample TherapyRouter::process() {
   StereoSample out{0.0f, 0.0f};
   if (!isActive())
     return out;
+
+  // If a PIP reset is pending, wait until PIP is effectively silent, then reset
+  // its internal schedule and fade back in.
+  if (pipResetPending_) {
+    const float pipNow = pipGainSmoother_.current();
+    if (pipNow < 0.001f) {
+      pip_.reset();
+      pipResetPending_ = false;
+      pipGainSmoother_.setTarget(pipTargetEnableAfterReset_ ? 1.0f : 0.0f);
+      pipTargetEnableAfterReset_ = false;
+    }
+  }
 
   const double baseFreq = config_.baseFreq;
   const float baseAmp = config_.baseAmp;

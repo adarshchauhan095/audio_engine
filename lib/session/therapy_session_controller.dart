@@ -144,9 +144,9 @@ class TherapySessionController {
       // Calculate phase durations based on total minutes
       // e.g., 20% warmup, 60% main, 20% cooldown
       int totalSecondsConfigured = durationMinutes * 60;
-      this.warmupDuration = (totalSecondsConfigured * 0.2).round();
-      this.cooldownDuration = (totalSecondsConfigured * 0.2).round();
-      this.mainDuration = totalSecondsConfigured - this.warmupDuration - this.cooldownDuration;
+      warmupDuration = (totalSecondsConfigured * 0.2).round();
+      cooldownDuration = (totalSecondsConfigured * 0.2).round();
+      mainDuration = totalSecondsConfigured - warmupDuration - cooldownDuration;
       
       intensity.value = 0.0;
       currentPhase.value = TherapyPhase.warmup;
