@@ -12,6 +12,7 @@ import 'tinnitus_detection_screen.dart';
 import 'ams_matching_screen.dart';
 import 'hearing_threshold_check_screen.dart';
 import 'premium_features_screen.dart';
+import '../../hearing_profile_flow/hearing_profile_flow.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -81,7 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 icon: Icons.hearing,
                 onTap: () => _pushScreen(
                   context,
-                  HearingThresholdCheckScreen(runtime: _runtime),
+                  HearingProfileFlow(runtime: _runtime),
                 ),
               ),
               _ModuleCard(

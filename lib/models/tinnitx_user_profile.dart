@@ -2,6 +2,8 @@
 ///
 /// - JSON keys are **snake_case** exactly as specified.
 /// - Dart fields use idiomatic camelCase, mapped in [toJson]/[fromJson].
+import 'hearing_profile.dart';
+
 class TinnitXUserProfile {
   const TinnitXUserProfile({
     required this.userId,
@@ -15,6 +17,7 @@ class TinnitXUserProfile {
     this.stressLevel,
     this.sessionFeedback,
     this.residualInhibitionSec,
+    this.hearingProfile,
   });
 
   final String userId;
@@ -40,6 +43,9 @@ class TinnitXUserProfile {
   /// Optional: seconds of perceived relief after a session.
   final double? residualInhibitionSec;
 
+  /// Optional hearing profile check results (stored in user profile JSON).
+  final HearingProfile? hearingProfile;
+
   TinnitXUserProfile copyWith({
     String? userId,
     double? tinnitusFrequency,
@@ -52,12 +58,14 @@ class TinnitXUserProfile {
     double? stressLevel,
     SessionFeedback? sessionFeedback,
     double? residualInhibitionSec,
+    HearingProfile? hearingProfile,
     bool clearAge = false,
     bool clearSubjectiveHearingProfile = false,
     bool clearSoundSensitivity = false,
     bool clearStressLevel = false,
     bool clearSessionFeedback = false,
     bool clearResidualInhibitionSec = false,
+    bool clearHearingProfile = false,
   }) {
     return TinnitXUserProfile(
       userId: userId ?? this.userId,
@@ -80,6 +88,9 @@ class TinnitXUserProfile {
       residualInhibitionSec: clearResidualInhibitionSec
           ? null
           : (residualInhibitionSec ?? this.residualInhibitionSec),
+      hearingProfile: clearHearingProfile
+          ? null
+          : (hearingProfile ?? this.hearingProfile),
     );
   }
 
@@ -96,6 +107,7 @@ class TinnitXUserProfile {
       'stress_level': stressLevel,
       'session_feedback': sessionFeedback?.value,
       'residual_inhibition_sec': residualInhibitionSec,
+      'hearing_profile': hearingProfile?.toJson(),
     };
   }
 
@@ -115,6 +127,7 @@ class TinnitXUserProfile {
       stressLevel: _toNullableDouble(json['stress_level']),
       sessionFeedback: SessionFeedbackX.tryParse(json['session_feedback']),
       residualInhibitionSec: _toNullableDouble(json['residual_inhibition_sec']),
+      hearingProfile: HearingProfile.fromJson(json['hearing_profile']),
     );
   }
 

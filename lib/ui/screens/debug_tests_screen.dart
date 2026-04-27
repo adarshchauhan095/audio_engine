@@ -14,7 +14,17 @@ class DebugTestsScreen extends StatefulWidget {
 class _DebugTestsScreenState extends State<DebugTestsScreen> {
   int _longRunDurationSeconds = 30;
 
-  static const List<int> _longRunDurations = [15, 30, 45, 60];
+  static const List<int> _longRunDurations = [
+    15,
+    30,
+    45,
+    60,
+    300,
+    600,
+    1200,
+    1800,
+    3600,
+  ];
 
   @override
   void initState() {
