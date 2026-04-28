@@ -32,6 +32,8 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
   @override
   void initState() {
     super.initState();
+    // Stop any running therapy/debug session before the tone generator takes over.
+    widget.runtime.prepareForHearingProfile();
     _tones = ToneGeneratorService(widget.runtime);
     _amsFrequencyFuture = _loadAmsFrequencyHz();
   }
@@ -175,6 +177,11 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
               case '/summary':
                 page = _SummaryScreen(
                   onContinue: () => _persistAndExit(amsHz: amsHz),
+                  threshold250: threshold250,
+                  balancing1000: balancing1000,
+                  thresholdAMS: thresholdAMS,
+                  threshold12k: threshold12k,
+                  amsHz: amsHz,
                 );
                 break;
               default:
@@ -518,11 +525,54 @@ class _BalancingScreenState extends State<_BalancingScreen> {
 }
 
 class _SummaryScreen extends StatelessWidget {
-  const _SummaryScreen({required this.onContinue});
+  const _SummaryScreen({
+    required this.onContinue,
+    required this.threshold250,
+    required this.balancing1000,
+    required this.thresholdAMS,
+    required this.threshold12k,
+    required this.amsHz,
+  });
+
   final VoidCallback onContinue;
+  final double? threshold250;
+  final double balancing1000;
+  final double? thresholdAMS;
+  final double? threshold12k;
+  final double amsHz;
+
+  String _fmtLevel(double? v) {
+    if (v == null) return 'skipped';
+    return '${(v * 100).toStringAsFixed(0)}%';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final rows = [
+      (
+        label: 'Lower audible range (250 Hz)',
+        value: threshold250 == null
+            ? 'skipped'
+            : 'threshold: ${_fmtLevel(threshold250)}',
+      ),
+      (
+        label: 'Balancing level (1000 Hz)',
+        value: '${balancing1000.toStringAsFixed(0)}%',
+      ),
+      (
+        label: 'Tinnitus frequency (${amsHz.toStringAsFixed(0)} Hz)',
+        value: thresholdAMS == null
+            ? 'skipped'
+            : 'threshold: ${_fmtLevel(thresholdAMS)}',
+      ),
+      (
+        label: 'Upper audible range (12 kHz)',
+        value: threshold12k == null
+            ? 'skipped'
+            : 'threshold: ${_fmtLevel(threshold12k)}',
+      ),
+    ];
+
     return _BaseScaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -538,12 +588,39 @@ class _SummaryScreen extends StatelessWidget {
             'Your hearing profile has been created.',
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
-          const Text('• Lower audible range'),
-          const SizedBox(height: 6),
-          const Text('• Upper audible range'),
-          const SizedBox(height: 6),
-          const Text('• Sensitivity around tinnitus frequency'),
+          const SizedBox(height: 20),
+          ...rows.map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• ', style: TextStyle(fontSize: 16)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          r.label,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          r.value,
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withAlpha(180),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const Spacer(),
           FilledButton(
             onPressed: onContinue,

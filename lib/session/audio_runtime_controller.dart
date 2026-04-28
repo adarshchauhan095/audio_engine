@@ -486,6 +486,14 @@ class AudioRuntimeController {
     setAmplitude(moduleDefaultAmplitude);
   }
 
+  /// Opening **Hearing Profile Check**: stops any running session/therapy so the
+  /// dedicated [ToneGeneratorService] starts with a clean engine state.
+  void prepareForHearingProfile() {
+    _prepareModuleBoundary();
+    setFrequency(moduleDefaultFrequencyHz);
+    setAmplitude(moduleDefaultAmplitude);
+  }
+
   void applySessionParams(SessionParams params) {
     if (_engine == null) return;
     setFrequency(params.frequencyHz);

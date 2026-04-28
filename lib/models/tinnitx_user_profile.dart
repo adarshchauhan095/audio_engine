@@ -1,7 +1,7 @@
-/// TinnitX user profile aligned to the official JSON schema.
-///
-/// - JSON keys are **snake_case** exactly as specified.
-/// - Dart fields use idiomatic camelCase, mapped in [toJson]/[fromJson].
+// TinnitX user profile aligned to the official JSON schema.
+//
+// - JSON keys are **snake_case** exactly as specified.
+// - Dart fields use idiomatic camelCase, mapped in [toJson]/[fromJson].
 import 'hearing_profile.dart';
 
 class TinnitXUserProfile {
