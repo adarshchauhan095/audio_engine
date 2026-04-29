@@ -21,6 +21,11 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
 
   final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
+  /// Tracks routes so [_ThresholdScreen]/[_BalancingScreen] can run
+  /// [RouteAware.didPopNext] when the user pops back (stack preserves state).
+  final RouteObserver<ModalRoute<Object?>> _routeObserver =
+      RouteObserver<ModalRoute<Object?>>();
+
   late final ToneGeneratorService _tones;
   late final Future<double> _amsFrequencyFuture;
 
@@ -45,9 +50,6 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
   }
 
   Future<double> _loadAmsFrequencyHz() async {
-    // The client spec says the AMS frequency is provided by the system.
-    // In this app, the profile's tinnitusFrequency is always set (minimal
-    // profile defaults to 4000 Hz), so this remains deterministic.
     final profile =
         await TinnitXUserProfileStorage.getOrCreateMinimal(userId: _userId);
     final double hz = profile.tinnitusFrequency;
@@ -108,6 +110,9 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
 
         return Navigator(
           key: _navKey,
+          observers: <NavigatorObserver>[
+            _routeObserver,
+          ],
           onGenerateRoute: (settings) {
             final String name = settings.name ?? '/';
             late Widget page;
@@ -120,6 +125,7 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                 break;
               case '/t250':
                 page = _ThresholdScreen(
+                  routeObserver: _routeObserver,
                   tones: _tones,
                   titleHz: 250,
                   onPlayFailed: _toastAudioUnavailable,
@@ -135,6 +141,7 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                 break;
               case '/b1000':
                 page = _BalancingScreen(
+                  routeObserver: _routeObserver,
                   tones: _tones,
                   onPlayFailed: _toastAudioUnavailable,
                   initialPercent: balancing1000,
@@ -146,6 +153,7 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                 break;
               case '/tams':
                 page = _ThresholdScreen(
+                  routeObserver: _routeObserver,
                   tones: _tones,
                   titleHz: amsHz.round(),
                   onPlayFailed: _toastAudioUnavailable,
@@ -161,6 +169,7 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                 break;
               case '/t12k':
                 page = _ThresholdScreen(
+                  routeObserver: _routeObserver,
                   tones: _tones,
                   titleHz: 12000,
                   onPlayFailed: _toastAudioUnavailable,
@@ -196,6 +205,10 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Shared scaffold
+// ---------------------------------------------------------------------------
+
 class _BaseScaffold extends StatelessWidget {
   const _BaseScaffold({required this.body});
   final Widget body;
@@ -213,6 +226,10 @@ class _BaseScaffold extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Intro screen
+// ---------------------------------------------------------------------------
 
 class _IntroScreen extends StatelessWidget {
   const _IntroScreen({required this.onStart, required this.onSkip});
@@ -265,8 +282,13 @@ class _IntroScreen extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Threshold screen (250 Hz / AMS / 12 kHz)
+// ---------------------------------------------------------------------------
+
 class _ThresholdScreen extends StatefulWidget {
   const _ThresholdScreen({
+    required this.routeObserver,
     required this.tones,
     required this.titleHz,
     required this.onPlayFailed,
@@ -274,6 +296,7 @@ class _ThresholdScreen extends StatefulWidget {
     required this.onSkip,
   });
 
+  final RouteObserver<ModalRoute<Object?>> routeObserver;
   final ToneGeneratorService tones;
   final int titleHz;
   final VoidCallback onPlayFailed;
@@ -284,150 +307,194 @@ class _ThresholdScreen extends StatefulWidget {
   State<_ThresholdScreen> createState() => _ThresholdScreenState();
 }
 
-class _ThresholdScreenState extends State<_ThresholdScreen> {
+class _ThresholdScreenState extends State<_ThresholdScreen> with RouteAware {
+  static const double _initialLevel = 0.30;
+
+  double _level01 = _initialLevel;
+
+  /// Guards against double-taps and in-flight async operations.
   bool _busy = false;
-  double _level01 = 0.30;
+
+  /// Syncs tone engine + local level when this screen becomes active — both
+  /// first visit ([initState]) and return via back navigation ([didPopNext]).
+  void _syncFromRouteEntry() {
+    _level01 = _initialLevel;
+    widget.tones.reset(
+      frequencyHz: widget.titleHz.toDouble(),
+      level01: _level01,
+    );
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
-    widget.tones.configure(frequencyHz: widget.titleHz.toDouble(), level01: _level01);
+    _syncFromRouteEntry();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    widget.routeObserver.subscribe(
+      this,
+      ModalRoute.of(context)!,
+    );
+  }
+
+  @override
+  void didPopNext() {
+    _syncFromRouteEntry();
   }
 
   @override
   void dispose() {
-    widget.tones.stop();
+    widget.routeObserver.unsubscribe(this);
+    // Immediate stop so the next screen's initState is never racing a fade.
+    widget.tones.stopNow();
     super.dispose();
   }
 
-  Future<void> _debounced(FutureOr<void> Function() fn) async {
+  Future<void> _debounced(Future<void> Function() fn) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await Future<void>.sync(fn);
+      await fn();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  Future<void> _onToggle() => _debounced(() async {
+        if (!widget.tones.canOutputAudio) {
+          widget.onPlayFailed();
+          return;
+        }
+        await widget.tones.toggle();
+        if (mounted) setState(() {});
+      });
+
+  Future<void> _onHeard() => _debounced(() async {
+        _level01 = widget.tones.stepDb(-2.0);
+        widget.tones.configure(
+          frequencyHz: widget.titleHz.toDouble(),
+          level01: _level01,
+        );
+      });
+
+  Future<void> _onNotHeard() => _debounced(() async {
+        _level01 = widget.tones.stepDb(2.0);
+        widget.tones.configure(
+          frequencyHz: widget.titleHz.toDouble(),
+          level01: _level01,
+        );
+      });
+
+  Future<void> _onSetThreshold() => _debounced(() async {
+        await widget.tones.stopFaded();
+        if (!mounted) return;
+        widget.onSet(_level01);
+      });
+
+  Future<void> _onSkip() => _debounced(() async {
+        await widget.tones.stopFaded();
+        if (!mounted) return;
+        widget.onSkip();
+      });
+
   @override
   Widget build(BuildContext context) {
-    final bool playing = widget.tones.isPlaying;
-
-    return _BaseScaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 8),
-          Text(
-            'Tone at ${widget.titleHz} Hz',
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: _busy
-                ? null
-                : () => _debounced(() {
-                      if (!widget.tones.canOutputAudio) {
-                        widget.onPlayFailed();
-                        return;
-                      }
-                      widget.tones.toggle();
-                      setState(() {});
-                    }),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(playing ? 'Stop' : 'Play'),
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Can you hear this tone?',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Row(
+    // ValueListenableBuilder keeps the Play/Stop label in sync with the actual
+    // audio state even when the engine's async fade changes it externally.
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.tones.playingNotifier,
+      builder: (context, playing, _) {
+        return _BaseScaffold(
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: _busy
-                      ? null
-                      : () => _debounced(() {
-                            _level01 = widget.tones.stepDb(-2.0);
-                            widget.tones.configure(
-                              frequencyHz: widget.titleHz.toDouble(),
-                              level01: _level01,
-                            );
-                          }),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Text('Heard'),
-                  ),
+              const SizedBox(height: 8),
+              Text(
+                'Tone at ${widget.titleHz} Hz',
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              FilledButton.tonal(
+                onPressed: _busy ? null : _onToggle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(playing ? 'Stop' : 'Play'),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _busy
-                      ? null
-                      : () => _debounced(() {
-                            _level01 = widget.tones.stepDb(2.0);
-                            widget.tones.configure(
-                              frequencyHz: widget.titleHz.toDouble(),
-                              level01: _level01,
-                            );
-                          }),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Text('Not heard'),
+              const SizedBox(height: 18),
+              const Text(
+                'Can you hear this tone?',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _busy ? null : _onHeard,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        child: Text('Heard'),
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _busy ? null : _onNotHeard,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        child: Text('Not heard'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'When the tone becomes just barely audible:',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: _busy ? null : _onSetThreshold,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('Set Threshold'),
                 ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: _busy ? null : _onSkip,
+                child: const Text('Skip Test'),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          const Text(
-            'When the tone becomes just barely audible:',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          FilledButton(
-            onPressed: _busy
-                ? null
-                : () => _debounced(() {
-                      widget.tones.stop();
-                      widget.onSet(_level01);
-                    }),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('Set Threshold'),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextButton(
-            onPressed: _busy
-                ? null
-                : () => _debounced(() {
-                      widget.tones.stop();
-                      widget.onSkip();
-                    }),
-            child: const Text('Skip Test'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// Balancing screen (1000 Hz)
+// ---------------------------------------------------------------------------
+
 class _BalancingScreen extends StatefulWidget {
   const _BalancingScreen({
+    required this.routeObserver,
     required this.tones,
     required this.onPlayFailed,
     required this.initialPercent,
     required this.onNext,
   });
 
+  final RouteObserver<ModalRoute<Object?>> routeObserver;
   final ToneGeneratorService tones;
   final VoidCallback onPlayFailed;
   final double initialPercent;
@@ -437,92 +504,130 @@ class _BalancingScreen extends StatefulWidget {
   State<_BalancingScreen> createState() => _BalancingScreenState();
 }
 
-class _BalancingScreenState extends State<_BalancingScreen> {
-  bool _busy = false;
+class _BalancingScreenState extends State<_BalancingScreen> with RouteAware {
   double _percent = 50.0;
+
+  /// Guards "Next" from being pressed twice.
+  bool _navigating = false;
+
+  void _syncFromRouteEntry() {
+    // After pushing forward with _navigating=true, underlying route stays
+    // mounted; clear so Play/Slider work when user pops back.
+    _navigating = false;
+    _percent = widget.initialPercent.clamp(0.0, 100.0);
+    widget.tones.reset(
+      frequencyHz: 1000.0,
+      level01: _percent / 100.0,
+    );
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
-    _percent = widget.initialPercent.clamp(0.0, 100.0);
-    widget.tones.configure(frequencyHz: 1000.0, level01: _percent / 100.0);
+    _syncFromRouteEntry();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    widget.routeObserver.subscribe(
+      this,
+      ModalRoute.of(context)!,
+    );
+  }
+
+  @override
+  void didPopNext() {
+    _syncFromRouteEntry();
   }
 
   @override
   void dispose() {
-    widget.tones.stop();
+    widget.routeObserver.unsubscribe(this);
+    widget.tones.stopNow();
     super.dispose();
+  }
+
+  Future<void> _onToggle() async {
+    if (!widget.tones.canOutputAudio) {
+      widget.onPlayFailed();
+      return;
+    }
+    await widget.tones.toggle();
+    if (mounted) setState(() {});
+  }
+
+  void _onSliderChanged(double v) {
+    setState(() => _percent = v);
+    widget.tones.setLevelSmooth(v / 100.0);
+  }
+
+  Future<void> _onNext() async {
+    if (_navigating) return;
+    setState(() => _navigating = true);
+    await widget.tones.stopFaded();
+    if (!mounted) return;
+    widget.onNext(_percent);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool playing = widget.tones.isPlaying;
-    return _BaseScaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 8),
-          Text(
-            'Tone at 1000 Hz',
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.tones.playingNotifier,
+      builder: (context, playing, _) {
+        return _BaseScaffold(
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                'Tone at 1000 Hz',
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              // Play/Stop — identical pattern to _ThresholdScreen
+              FilledButton.tonal(
+                onPressed: _navigating ? null : _onToggle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(playing ? 'Stop' : 'Play'),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('Adjust loudness:'),
+              Slider(
+                value: _percent,
+                min: 0,
+                max: 100,
+                divisions: 100,
+                onChanged: _navigating ? null : _onSliderChanged,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Current Level: ${_percent.toStringAsFixed(0)}%',
+                textAlign: TextAlign.center,
+              ),
+              const Spacer(),
+              FilledButton(
+                onPressed: _navigating ? null : _onNext,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('Next'),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: _busy
-                ? null
-                : () {
-                    if (!widget.tones.canOutputAudio) {
-                      widget.onPlayFailed();
-                      return;
-                    }
-                    setState(() {
-                      widget.tones.toggle();
-                    });
-                  },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(playing ? 'Stop' : 'Play'),
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text('Adjust loudness:'),
-          Slider(
-            value: _percent,
-            min: 0,
-            max: 100,
-            divisions: 100,
-            onChanged: _busy
-                ? null
-                : (v) {
-                    setState(() => _percent = v);
-                    widget.tones.setLevelSmooth(v / 100.0);
-                  },
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Current Level: ${_percent.toStringAsFixed(0)}%',
-            textAlign: TextAlign.center,
-          ),
-          const Spacer(),
-          FilledButton(
-            onPressed: _busy
-                ? null
-                : () {
-                    setState(() => _busy = true);
-                    widget.tones.stop();
-                    widget.onNext(_percent);
-                  },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('Next'),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Summary screen
+// ---------------------------------------------------------------------------
 
 class _SummaryScreen extends StatelessWidget {
   const _SummaryScreen({
@@ -634,4 +739,3 @@ class _SummaryScreen extends StatelessWidget {
     );
   }
 }
-
