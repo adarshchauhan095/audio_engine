@@ -131,10 +131,15 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                   onPlayFailed: _toastAudioUnavailable,
                   onSet: (v) {
                     threshold250 = v;
+                    // Stop audio before pushing forward: the old screen stays
+                    // alive on the stack (pushNamed doesn't dispose it), so we
+                    // must silence it here rather than relying on dispose().
+                    _tones.stopNow();
                     _navKey.currentState!.pushNamed('/b1000');
                   },
                   onSkip: () {
                     threshold250 = null;
+                    _tones.stopNow();
                     _navKey.currentState!.pushNamed('/b1000');
                   },
                 );
@@ -147,6 +152,8 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                   initialPercent: balancing1000,
                   onNext: (percent) {
                     balancing1000 = percent;
+                    // Stop audio before pushing forward (same reason as above).
+                    _tones.stopNow();
                     _navKey.currentState!.pushNamed('/tams');
                   },
                 );
@@ -159,10 +166,12 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                   onPlayFailed: _toastAudioUnavailable,
                   onSet: (v) {
                     thresholdAMS = v;
+                    _tones.stopNow();
                     _navKey.currentState!.pushNamed('/t12k');
                   },
                   onSkip: () {
                     thresholdAMS = null;
+                    _tones.stopNow();
                     _navKey.currentState!.pushNamed('/t12k');
                   },
                 );
@@ -175,10 +184,12 @@ class _HearingProfileFlowState extends State<HearingProfileFlow> {
                   onPlayFailed: _toastAudioUnavailable,
                   onSet: (v) {
                     threshold12k = v;
+                    _tones.stopNow();
                     _navKey.currentState!.pushNamed('/summary');
                   },
                   onSkip: () {
                     threshold12k = null;
+                    _tones.stopNow();
                     _navKey.currentState!.pushNamed('/summary');
                   },
                 );
@@ -374,19 +385,14 @@ class _ThresholdScreenState extends State<_ThresholdScreen> with RouteAware {
       });
 
   Future<void> _onHeard() => _debounced(() async {
+        // stepDb cancels any in-flight ramp and smoothly ramps to the new
+        // level. A separate configure() call is not needed and would cause a
+        // double-ramp that produces the audible "modulation" at 12 kHz.
         _level01 = widget.tones.stepDb(-2.0);
-        widget.tones.configure(
-          frequencyHz: widget.titleHz.toDouble(),
-          level01: _level01,
-        );
       });
 
   Future<void> _onNotHeard() => _debounced(() async {
         _level01 = widget.tones.stepDb(2.0);
-        widget.tones.configure(
-          frequencyHz: widget.titleHz.toDouble(),
-          level01: _level01,
-        );
       });
 
   Future<void> _onSetThreshold() => _debounced(() async {
@@ -514,6 +520,7 @@ class _BalancingScreenState extends State<_BalancingScreen> with RouteAware {
     // After pushing forward with _navigating=true, underlying route stays
     // mounted; clear so Play/Slider work when user pops back.
     _navigating = false;
+    _busy = false;
     _percent = widget.initialPercent.clamp(0.0, 100.0);
     widget.tones.reset(
       frequencyHz: 1000.0,
@@ -549,22 +556,37 @@ class _BalancingScreenState extends State<_BalancingScreen> with RouteAware {
     super.dispose();
   }
 
-  Future<void> _onToggle() async {
-    if (!widget.tones.canOutputAudio) {
-      widget.onPlayFailed();
-      return;
+  /// Guards against double-taps and in-flight toggle operations,
+  /// matching the debounce pattern used in _ThresholdScreen.
+  bool _busy = false;
+
+  Future<void> _debounced(Future<void> Function() fn) async {
+    if (_busy || _navigating) return;
+    setState(() => _busy = true);
+    try {
+      await fn();
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    await widget.tones.toggle();
-    if (mounted) setState(() {});
   }
 
+  Future<void> _onToggle() => _debounced(() async {
+        if (!widget.tones.canOutputAudio) {
+          widget.onPlayFailed();
+          return;
+        }
+        await widget.tones.toggle();
+        if (mounted) setState(() {});
+      });
+
   void _onSliderChanged(double v) {
+    if (_busy || _navigating) return;
     setState(() => _percent = v);
     widget.tones.setLevelSmooth(v / 100.0);
   }
 
   Future<void> _onNext() async {
-    if (_navigating) return;
+    if (_navigating || _busy) return;
     setState(() => _navigating = true);
     await widget.tones.stopFaded();
     if (!mounted) return;
@@ -589,7 +611,7 @@ class _BalancingScreenState extends State<_BalancingScreen> with RouteAware {
               const SizedBox(height: 12),
               // Play/Stop — identical pattern to _ThresholdScreen
               FilledButton.tonal(
-                onPressed: _navigating ? null : _onToggle,
+                onPressed: (_navigating || _busy) ? null : _onToggle,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Text(playing ? 'Stop' : 'Play'),
@@ -602,7 +624,7 @@ class _BalancingScreenState extends State<_BalancingScreen> with RouteAware {
                 min: 0,
                 max: 100,
                 divisions: 100,
-                onChanged: _navigating ? null : _onSliderChanged,
+                onChanged: (_navigating || _busy) ? null : _onSliderChanged,
               ),
               const SizedBox(height: 6),
               Text(
@@ -611,7 +633,7 @@ class _BalancingScreenState extends State<_BalancingScreen> with RouteAware {
               ),
               const Spacer(),
               FilledButton(
-                onPressed: _navigating ? null : _onNext,
+                onPressed: (_navigating || _busy) ? null : _onNext,
                 child: const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Text('Next'),
