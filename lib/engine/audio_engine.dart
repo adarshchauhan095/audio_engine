@@ -166,6 +166,71 @@ class AudioEngine implements AudioControl {
     return _bindings.therapyStop(_handle!);
   }
 
+  int phase2Start({
+    required int modulationType,
+    required int filterType,
+    required double intensity,
+    required double baseFreq,
+    required double baseAmp,
+    required double depth,
+    required double rateHz,
+    required double bandwidthHz,
+    required double filterFreqHz,
+    required double q,
+    required double transitionMs,
+  }) {
+    if (_handle == null) return -1;
+    return _bindings.phase2Start(
+      _handle!,
+      modulationType,
+      filterType,
+      intensity,
+      baseFreq,
+      baseAmp,
+      depth,
+      rateHz,
+      bandwidthHz,
+      filterFreqHz,
+      q,
+      transitionMs,
+    );
+  }
+
+  int phase2Update({
+    required int modulationType,
+    required int filterType,
+    required double intensity,
+    required double baseFreq,
+    required double baseAmp,
+    required double depth,
+    required double rateHz,
+    required double bandwidthHz,
+    required double filterFreqHz,
+    required double q,
+    required double transitionMs,
+  }) {
+    if (_handle == null) return -1;
+    return _bindings.phase2Update(
+      _handle!,
+      modulationType,
+      filterType,
+      intensity,
+      baseFreq,
+      baseAmp,
+      depth,
+      rateHz,
+      bandwidthHz,
+      filterFreqHz,
+      q,
+      transitionMs,
+    );
+  }
+
+  int phase2Stop() {
+    if (_handle == null) return -1;
+    return _bindings.phase2Stop(_handle!);
+  }
+
   void setStereoEnabled(bool enabled) {
     if (_handle == null) return;
     _bindings.setStereoEnabled(_handle!, enabled ? 1 : 0);

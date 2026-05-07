@@ -31,6 +31,38 @@ typedef _TherapyFuncDart = int Function(NativeAudioHandle, int, int, int, int, i
 typedef _TherapyStopFuncC = Int32 Function(NativeAudioHandle);
 typedef _TherapyStopFuncDart = int Function(NativeAudioHandle);
 
+typedef _Phase2FuncC = Int32 Function(
+  NativeAudioHandle,
+  Int32, // modulationType
+  Int32, // filterType
+  Float, // intensity
+  Float, // baseFreq
+  Float, // baseAmp
+  Float, // depth
+  Float, // rateHz
+  Float, // bandwidthHz
+  Float, // filterFreqHz
+  Float, // q
+  Float, // transitionMs
+);
+typedef _Phase2FuncDart = int Function(
+  NativeAudioHandle,
+  int,
+  int,
+  double,
+  double,
+  double,
+  double,
+  double,
+  double,
+  double,
+  double,
+  double,
+);
+
+typedef _Phase2StopFuncC = Int32 Function(NativeAudioHandle);
+typedef _Phase2StopFuncDart = int Function(NativeAudioHandle);
+
 typedef LogCallbackC = Void Function(Pointer<Utf8>);
 typedef _RegisterLogC = Void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
 typedef _RegisterLogDart = void Function(NativeAudioHandle, Pointer<NativeFunction<LogCallbackC>>);
@@ -63,6 +95,9 @@ class NativeBindings {
   late final _TherapyFuncDart _therapyStart;
   late final _TherapyFuncDart _therapyUpdate;
   late final _TherapyStopFuncDart _therapyStop;
+  late final _Phase2FuncDart _phase2Start;
+  late final _Phase2FuncDart _phase2Update;
+  late final _Phase2StopFuncDart _phase2Stop;
   late final _RegisterLogDart _registerLogCallback;
   late final _RegisterOutputLostDart _registerOutputLostCallback;
   late final _VoidNativeAudioHandleFuncDart _resetOutputStream;
@@ -116,6 +151,17 @@ class NativeBindings {
           _TherapyStopFuncC,
           _TherapyStopFuncDart
         >('audio_therapy_stop');
+    _phase2Start = lib.lookupFunction<_Phase2FuncC, _Phase2FuncDart>(
+      'audio_phase2_start',
+    );
+    _phase2Update = lib.lookupFunction<_Phase2FuncC, _Phase2FuncDart>(
+      'audio_phase2_update',
+    );
+    _phase2Stop = lib
+        .lookupFunction<
+          _Phase2StopFuncC,
+          _Phase2StopFuncDart
+        >('audio_phase2_stop');
     _registerLogCallback = lib.lookupFunction<_RegisterLogC, _RegisterLogDart>('audio_register_log_callback');
     _registerOutputLostCallback = lib.lookupFunction<_RegisterOutputLostC, _RegisterOutputLostDart>(
       'audio_register_output_lost_callback',
@@ -169,6 +215,66 @@ class NativeBindings {
       _therapyUpdate(handle, sub, rmp, pip, side, bin, intensity, freq, amp, rmpDepth, rmpRate, pipInterval, pipDuration, sidebandOffset, sidebandIntensity, binauralOffset);
       
   int therapyStop(NativeAudioHandle handle) => _therapyStop(handle);
+
+  int phase2Start(
+    NativeAudioHandle handle,
+    int modulationType,
+    int filterType,
+    double intensity,
+    double baseFreq,
+    double baseAmp,
+    double depth,
+    double rateHz,
+    double bandwidthHz,
+    double filterFreqHz,
+    double q,
+    double transitionMs,
+  ) =>
+      _phase2Start(
+        handle,
+        modulationType,
+        filterType,
+        intensity,
+        baseFreq,
+        baseAmp,
+        depth,
+        rateHz,
+        bandwidthHz,
+        filterFreqHz,
+        q,
+        transitionMs,
+      );
+
+  int phase2Update(
+    NativeAudioHandle handle,
+    int modulationType,
+    int filterType,
+    double intensity,
+    double baseFreq,
+    double baseAmp,
+    double depth,
+    double rateHz,
+    double bandwidthHz,
+    double filterFreqHz,
+    double q,
+    double transitionMs,
+  ) =>
+      _phase2Update(
+        handle,
+        modulationType,
+        filterType,
+        intensity,
+        baseFreq,
+        baseAmp,
+        depth,
+        rateHz,
+        bandwidthHz,
+        filterFreqHz,
+        q,
+        transitionMs,
+      );
+
+  int phase2Stop(NativeAudioHandle handle) => _phase2Stop(handle);
   
   void setStereoEnabled(NativeAudioHandle handle, int enabled) => _setStereoEnabled(handle, enabled);
   

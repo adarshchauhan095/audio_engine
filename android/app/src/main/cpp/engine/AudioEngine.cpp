@@ -190,6 +190,39 @@ int AudioEngine::therapyStop() {
   return 1;
 }
 
+int AudioEngine::phase2Start(const Phase2Config& config) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const float sr =
+      stream_ ? static_cast<float>(stream_->getSampleRate()) : 48000.0f;
+  if (phase2RouterSampleRate_ <= 0.0f ||
+      std::fabs(phase2RouterSampleRate_ - sr) > 1e-3f) {
+    phase2Router_.init(sr);
+    phase2RouterSampleRate_ = sr;
+  }
+  phase2Router_.updateConfig(config);
+#ifndef NDEBUG
+  log("Phase2 started");
+#endif
+  return 1;
+}
+
+int AudioEngine::phase2Update(const Phase2Config& config) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  phase2Router_.updateConfig(config);
+  return 1;
+}
+
+int AudioEngine::phase2Stop() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  Phase2Config empty;
+  empty.enabled = false;
+  phase2Router_.updateConfig(empty);
+#ifndef NDEBUG
+  log("Phase2 stopped");
+#endif
+  return 1;
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream,
                                                    void *audioData,
                                                    int32_t numFrames) {
@@ -211,7 +244,17 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     float left = 0.0f;
     float right = 0.0f;
 
-    if (therapyRouter_.isActive()) {
+    if (phase2Router_.isActive()) {
+      StereoSample sr = phase2Router_.process();
+      if (!isStereo) {
+        const float mono = (sr.left + sr.right) * 0.5f;
+        sr.left = mono;
+        sr.right = mono;
+      }
+      left = sr.left * transport;
+      right = sr.right * transport;
+      voiceManager_.process();
+    } else if (therapyRouter_.isActive()) {
       StereoSample sr = therapyRouter_.process();
       if (!isStereo) {
         const float mono = (sr.left + sr.right) * 0.5f;

@@ -17,6 +17,7 @@ add_library(native_audio SHARED
   engine/Oscillator.cpp   # Implements the audio oscillator for generating tones.
   engine/VoiceManager.cpp # Voice container for optional multi-oscillator rendering.
   engine/TherapyRouter.cpp
+  engine/phase2/Phase2Router.cpp
   engine/modules/SubthresholdModule.cpp
   engine/modules/RMPModule.cpp
   engine/modules/PIPModule.cpp

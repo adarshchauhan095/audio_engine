@@ -85,6 +85,19 @@ int audio_therapy_update(NativeAudioHandle handle, int subthreshold, int rmp,
 
 int audio_therapy_stop(NativeAudioHandle handle);
 
+// Phase 2 (AM/FM/NBN + filters) - independent API surface.
+int audio_phase2_start(NativeAudioHandle handle, int modulationType, int filterType,
+                       float intensity, float baseFreq, float baseAmp,
+                       float depth, float rateHz, float bandwidthHz,
+                       float filterFreqHz, float q, float transitionMs);
+
+int audio_phase2_update(NativeAudioHandle handle, int modulationType, int filterType,
+                        float intensity, float baseFreq, float baseAmp,
+                        float depth, float rateHz, float bandwidthHz,
+                        float filterFreqHz, float q, float transitionMs);
+
+int audio_phase2_stop(NativeAudioHandle handle);
+
 void audio_set_stereo_enabled(NativeAudioHandle handle, int enabled);
 
 void audio_register_log_callback(NativeAudioHandle handle, AudioLogCallback cb);

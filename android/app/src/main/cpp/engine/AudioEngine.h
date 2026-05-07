@@ -14,6 +14,8 @@
 #include "ParameterSmoother.h"
 #include "TherapyRouter.h"
 #include "VoiceManager.h"
+#include "phase2/Phase2Config.h"
+#include "phase2/Phase2Router.h"
 
 /// Engine core: Oboe stream + DSP parameter control.
 ///
@@ -50,6 +52,11 @@ public:
   int therapyUpdate(const TherapyConfig &config);
   int therapyStop();
 
+  // Phase 2 API (AM/FM/NBN + filters) - independent from Therapy API.
+  int phase2Start(const Phase2Config &config);
+  int phase2Update(const Phase2Config &config);
+  int phase2Stop();
+
   typedef void (*LogCallback)(const char *);
   void setLogCallback(LogCallback cb) { logCb_ = cb; }
 
@@ -72,6 +79,7 @@ private:
   ParameterSmoother amplitudeSmoother_;
   ParameterSmoother transportSmoother_;
   TherapyRouter therapyRouter_;
+  Phase2Router phase2Router_;
 
   std::atomic<float> amplitudeTarget_{0.3f};
   std::atomic<double> currentFreq_{440.0};
@@ -79,6 +87,7 @@ private:
   std::atomic<bool> running_{false};
   std::atomic<int32_t> preferredDeviceId_{-1};
   float therapyRouterSampleRate_ = 0.0f;
+  float phase2RouterSampleRate_ = 0.0f;
   LogCallback logCb_ = nullptr;
   OutputLostCallback outputLostCb_ = nullptr;
 

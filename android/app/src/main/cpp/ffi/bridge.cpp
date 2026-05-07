@@ -1,6 +1,7 @@
 #include "bridge.h"                // Includes the FFI bridge declarations.
 #include "../engine/AudioEngine.h" // Includes the C++ AudioEngine class definition.
 #include "../engine/TherapyConfig.h"
+#include "../engine/phase2/Phase2Config.h"
 
 /// @brief Implements `audio_create()` from `bridge.h`.
 /// Creates a new instance of the `AudioEngine` class on the heap and returns
@@ -140,6 +141,50 @@ int audio_therapy_update(NativeAudioHandle h, int subthreshold, int rmp,
 
 int audio_therapy_stop(NativeAudioHandle h) {
   return static_cast<AudioEngine *>(h)->therapyStop();
+}
+
+static Phase2Config createPhase2Config(int modulationType, int filterType,
+                                       float intensity, float baseFreq,
+                                       float baseAmp, float depth, float rateHz,
+                                       float bandwidthHz, float filterFreqHz,
+                                       float q, float transitionMs) {
+  Phase2Config c;
+  c.enabled = true;
+  c.modulation =
+      static_cast<Phase2Config::ModulationType>(modulationType);
+  c.filter = static_cast<Phase2Config::FilterType>(filterType);
+  c.intensity = intensity;
+  c.baseFreq = baseFreq;
+  c.baseAmp = baseAmp;
+  c.depth = depth;
+  c.rateHz = rateHz;
+  c.bandwidthHz = bandwidthHz;
+  c.cutoffHz = filterFreqHz;
+  c.q = q;
+  c.transitionMs = transitionMs;
+  return c;
+}
+
+int audio_phase2_start(NativeAudioHandle h, int modulationType, int filterType,
+                       float intensity, float baseFreq, float baseAmp,
+                       float depth, float rateHz, float bandwidthHz,
+                       float filterFreqHz, float q, float transitionMs) {
+  return static_cast<AudioEngine*>(h)->phase2Start(createPhase2Config(
+      modulationType, filterType, intensity, baseFreq, baseAmp, depth, rateHz,
+      bandwidthHz, filterFreqHz, q, transitionMs));
+}
+
+int audio_phase2_update(NativeAudioHandle h, int modulationType, int filterType,
+                        float intensity, float baseFreq, float baseAmp,
+                        float depth, float rateHz, float bandwidthHz,
+                        float filterFreqHz, float q, float transitionMs) {
+  return static_cast<AudioEngine*>(h)->phase2Update(createPhase2Config(
+      modulationType, filterType, intensity, baseFreq, baseAmp, depth, rateHz,
+      bandwidthHz, filterFreqHz, q, transitionMs));
+}
+
+int audio_phase2_stop(NativeAudioHandle h) {
+  return static_cast<AudioEngine*>(h)->phase2Stop();
 }
 
 void audio_set_stereo_enabled(NativeAudioHandle h, int enabled) {
