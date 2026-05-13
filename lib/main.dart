@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/screens/basic_therapy_screen.dart';
+import 'ui/screens/phase_tabs_screen.dart';
 
 final RouteObserver<PageRoute<dynamic>> routeObserver =
     RouteObserver<PageRoute<dynamic>>();
@@ -43,7 +43,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       navigatorObservers: [routeObserver],
-      home: const BasicTherapyScreen(),
+      home: const PhaseTabsScreen(),
     );
   }
 }
