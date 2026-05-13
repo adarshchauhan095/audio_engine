@@ -4,6 +4,8 @@ import '../engine/audio_engine.dart';
 
 enum TherapyPhase { idle, warmup, mainPhase, cooldown }
 
+enum TherapyStopReason { user, completed }
+
 class TherapySessionController {
   TherapySessionController(this.engine);
   
@@ -14,6 +16,7 @@ class TherapySessionController {
   final ValueNotifier<int> remainingSeconds = ValueNotifier(0);
   final ValueNotifier<double> intensity = ValueNotifier(0.0);
   final ValueNotifier<int> totalTherapySeconds = ValueNotifier(0);
+  final ValueNotifier<bool> didComplete = ValueNotifier(false);
   
   Timer? _timer;
   int _ticksCount = 0;
@@ -124,6 +127,7 @@ class TherapySessionController {
     double targetBinauralOffset = 5.0,
   }) {
       _stopRequested = false;
+      didComplete.value = false;
       this.subthreshold = subthreshold;
       this.rmp = rmp;
       this.pip = pip;
@@ -206,7 +210,7 @@ class TherapySessionController {
      int remain = _endTime!.difference(now).inSeconds;
      
      if (remain <= 0) {
-       stopSession();
+       _stopSession(reason: TherapyStopReason.completed);
        return;
      } // keep going until 0
      
@@ -297,6 +301,10 @@ class TherapySessionController {
   }
   
   void stopSession() {
+    _stopSession(reason: TherapyStopReason.user);
+  }
+
+  void _stopSession({required TherapyStopReason reason}) {
      _stopRequested = true;
      _timer?.cancel();
      _timer = null;
@@ -344,9 +352,14 @@ class TherapySessionController {
        engine.stop();
        isRunning.value = false;
        currentPhase.value = TherapyPhase.idle;
+       didComplete.value = reason == TherapyStopReason.completed;
        debugPrint('SupportSession: session stopped');
        if (token == _smoothingToken) _smoothingToken = 0;
      }();
+  }
+
+  void resetCompletion() {
+    didComplete.value = false;
   }
   
   /// Live-updates the current therapy configuration while a session
@@ -499,5 +512,6 @@ class TherapySessionController {
      currentPhase.dispose();
      remainingSeconds.dispose();
      intensity.dispose();
+     didComplete.dispose();
   }
 }
