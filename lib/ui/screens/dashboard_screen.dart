@@ -5,7 +5,6 @@ import '../../session/audio_runtime_controller.dart';
 import 'audio_control_screen.dart';
 import 'debug_tests_screen.dart';
 import 'module_demo_screen.dart';
-import 'phase2_modulation_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'therapy_session_screen.dart';
@@ -109,11 +108,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Module Demo',
                 icon: Icons.science,
                 onTap: () => _pushScreen(context, ModuleDemoScreen(runtime: _runtime)),
-              ),
-              _ModuleCard(
-                title: 'Phase 2 Modulation Lab',
-                icon: Icons.waves,
-                onTap: () => _pushScreen(context, Phase2ModulationScreen(runtime: _runtime)),
               ),
               _ModuleCard(
                 title: 'Premium Features',

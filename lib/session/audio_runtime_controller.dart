@@ -233,7 +233,13 @@ class AudioRuntimeController {
         },
       );
       
-      _therapySessionController = TherapySessionController(_engine!);
+      _therapySessionController = TherapySessionController(
+        _engine!,
+        onModulatedVoiceOutput: (double frequencyHz, double amp) {
+          frequency.value = frequencyHz.clamp(freqMin, freqMax);
+          amplitude.value = amp.clamp(0.0, 1.0);
+        },
+      );
       _therapySessionController!.totalTherapySeconds
           .addListener(_scheduleTherapyAdherenceSave);
       _restoreTherapyAdherence();

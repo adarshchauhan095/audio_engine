@@ -1,7 +1,7 @@
 #include "bridge.h"                // Includes the FFI bridge declarations.
 #include "../engine/AudioEngine.h" // Includes the C++ AudioEngine class definition.
 #include "../engine/TherapyConfig.h"
-#include "../engine/phase2/Phase2Config.h"
+#include "../engine/advance_engine/AdvanceEngineConfig.h"
 
 /// @brief Implements `audio_create()` from `bridge.h`.
 /// Creates a new instance of the `AudioEngine` class on the heap and returns

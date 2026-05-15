@@ -14,8 +14,8 @@
 #include "ParameterSmoother.h"
 #include "TherapyRouter.h"
 #include "VoiceManager.h"
-#include "phase2/Phase2Config.h"
-#include "phase2/Phase2Router.h"
+#include "advance_engine/AdvanceEngineConfig.h"
+#include "advance_engine/AdvanceEngineRouter.h"
 
 /// Engine core: Oboe stream + DSP parameter control.
 ///

@@ -5,7 +5,7 @@
 
 #include "Biquad.h"
 #include "NoiseGenerator.h"
-#include "Phase2Config.h"
+#include "AdvanceEngineConfig.h"
 
 // Phase2 modulation generator (mono). The router handles crossfades and
 // post-filtering; this focuses only on generating the raw signal for the

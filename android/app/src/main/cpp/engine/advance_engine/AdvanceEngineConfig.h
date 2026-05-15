@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-// Phase 2 configuration for AM/FM/NBN + filters.
+// Advance Engine configuration for AM/FM/NBN + filters.
 //
 // This is intentionally independent from TherapyConfig to avoid affecting
 // existing therapy modules and their FFI signatures.

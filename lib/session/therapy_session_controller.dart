@@ -1,15 +1,28 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
+
 import '../engine/audio_engine.dart';
+import '../storage/detected_frequency_storage.dart';
+import 'therapy_modulation_mode.dart';
 
 enum TherapyPhase { idle, warmup, mainPhase, cooldown }
 
 enum TherapyStopReason { user, completed }
 
 class TherapySessionController {
-  TherapySessionController(this.engine);
-  
+  TherapySessionController(
+    this.engine, {
+    void Function(double frequencyHz, double amplitude)?
+        onModulatedVoiceOutput,
+  }) : _onModulatedVoiceOutput = onModulatedVoiceOutput;
+
   final AudioEngine engine;
+
+  /// Notifies UI when modulation drives the voice path (FM / effective level).
+  final void Function(double frequencyHz, double amplitude)?
+      _onModulatedVoiceOutput;
   
   final ValueNotifier<bool> isRunning = ValueNotifier(false);
   final ValueNotifier<TherapyPhase> currentPhase = ValueNotifier(TherapyPhase.idle);
@@ -49,6 +62,27 @@ class TherapySessionController {
   int warmupDuration = 0; // calculated based on total duration
   int mainDuration = 0;
   int cooldownDuration = 0;
+
+  TherapyModulationMode _modulationMode = TherapyModulationMode.none;
+  double _amDepthPercent = 50;
+  double _amRateHz = 10;
+  double _fmDeviationHz = 100;
+  double _fmRateHz = 8;
+  double _nbnBandwidthHz = 200;
+  double _nbnDepthPercent = 30;
+  DateTime? _sessionStartedAt;
+  final math.Random _nbnRng = math.Random();
+  double _nbnNoiseState = 0;
+  double _lastVoiceFreq = 0;
+  double _lastVoiceAmp = 0;
+
+  TherapyModulationMode get modulationMode => _modulationMode;
+  double get liveAmDepthPercent => _amDepthPercent;
+  double get liveAmRateHz => _amRateHz;
+  double get liveFmDeviationHz => _fmDeviationHz;
+  double get liveFmRateHz => _fmRateHz;
+  double get liveNbnBandwidthHz => _nbnBandwidthHz;
+  double get liveNbnDepthPercent => _nbnDepthPercent;
 
   Future<void> _rampTherapyUpdate({
     required int token,
@@ -125,9 +159,27 @@ class TherapySessionController {
     double targetSidebandOffset = 100.0,
     double targetSidebandIntensity = 0.33,
     double targetBinauralOffset = 5.0,
+    TherapyModulationMode modulationMode = TherapyModulationMode.none,
+    double amDepthPercent = 50,
+    double amRateHz = 10,
+    double fmDeviationHz = 100,
+    double fmRateHz = 8,
+    double nbnBandwidthHz = 200,
+    double nbnDepthPercent = 30,
   }) {
       _stopRequested = false;
       didComplete.value = false;
+      _modulationMode = modulationMode;
+      _amDepthPercent = amDepthPercent;
+      _amRateHz = amRateHz;
+      _fmDeviationHz = fmDeviationHz;
+      _fmRateHz = fmRateHz;
+      _nbnBandwidthHz = nbnBandwidthHz;
+      _nbnDepthPercent = nbnDepthPercent;
+      _sessionStartedAt = DateTime.now();
+      _nbnNoiseState = 0;
+      _lastVoiceFreq = baseFreq;
+      _lastVoiceAmp = 0;
       this.subthreshold = subthreshold;
       this.rmp = rmp;
       this.pip = pip;
@@ -188,9 +240,11 @@ class TherapySessionController {
         debugPrint(
           'SupportSession: session started (${durationMinutes}min) '
           'sub=$subthreshold rmp=$rmp pip=$pip sidebands=$sidebands binaural=$binaural '
-          'baseFreq=$baseFreq baseAmp=$baseAmp',
+          'baseFreq=$baseFreq baseAmp=$baseAmp mod=$_modulationMode',
         );
       }
+
+      _applyModulatedVoiceIfNeeded();
 
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(milliseconds: 200), _onTick);
@@ -298,6 +352,86 @@ class TherapySessionController {
         'SupportSession: engine update (recovery) returned $updateResult',
       );
     }
+
+    _applyModulatedVoiceIfNeeded();
+  }
+
+  void _tickNbnNoise() {
+    final double w = _nbnBandwidthHz.clamp(50.0, 1000.0);
+    final double leak = (w / 2000.0).clamp(0.02, 0.35);
+    final double innov = (w / 400.0).clamp(0.02, 0.25);
+    _nbnNoiseState += innov * (_nbnRng.nextDouble() * 2.0 - 1.0);
+    _nbnNoiseState -= leak * _nbnNoiseState;
+    _nbnNoiseState = _nbnNoiseState.clamp(-1.0, 1.0);
+  }
+
+  /// Phase-2 modulation on the voice path (core envelope × modulation).
+  void _applyModulatedVoiceIfNeeded() {
+    if (_modulationMode == TherapyModulationMode.none) return;
+    if (_sessionStartedAt == null) return;
+
+    final double t =
+        DateTime.now().difference(_sessionStartedAt!).inMicroseconds / 1e6;
+    final double i = intensity.value.clamp(0.0, 1.0);
+
+    double freqOut = baseFreq;
+    double ampOut;
+
+    switch (_modulationMode) {
+      case TherapyModulationMode.none:
+        return;
+      case TherapyModulationMode.am:
+        final double depthFrac = (_amDepthPercent / 100.0).clamp(0.0, 1.0);
+        final double mod =
+            1.0 + depthFrac * math.sin(2.0 * math.pi * _amRateHz * t);
+        ampOut = (baseAmp * i * mod).clamp(0.0, 1.0);
+        break;
+      case TherapyModulationMode.fm:
+        freqOut = baseFreq +
+            _fmDeviationHz *
+                math.sin(2.0 * math.pi * _fmRateHz * t);
+        freqOut = freqOut.clamp(kMinFrequencyHz, kMaxFrequencyHz);
+        ampOut = (baseAmp * i).clamp(0.0, 1.0);
+        break;
+      case TherapyModulationMode.nbn:
+        _tickNbnNoise();
+        final double depthFrac = (_nbnDepthPercent / 100.0).clamp(0.0, 1.0);
+        final double mod = (1.0 + depthFrac * _nbnNoiseState).clamp(0.0, 2.0);
+        ampOut = (baseAmp * i * mod).clamp(0.0, 1.0);
+        break;
+    }
+
+    engine.setTargetFrequency(freqOut);
+    engine.setAmplitude(ampOut);
+    _lastVoiceFreq = freqOut;
+    _lastVoiceAmp = ampOut;
+    _onModulatedVoiceOutput?.call(freqOut, ampOut);
+  }
+
+  Future<void> _rampModulatedVoiceEnd(int token) async {
+    const int steps = 12;
+    const int stepMs = 6;
+    final double f0 = _lastVoiceFreq;
+    for (int i = 0; i <= steps; i++) {
+      if (token != _smoothingToken) return;
+      final double u = i / steps;
+      final double a = _lastVoiceAmp * (1.0 - u);
+      final double f = f0 + (baseFreq - f0) * u;
+      engine.setTargetFrequency(f.clamp(kMinFrequencyHz, kMaxFrequencyHz));
+      engine.setAmplitude(a.clamp(0.0, 1.0));
+      _onModulatedVoiceOutput?.call(
+        f.clamp(kMinFrequencyHz, kMaxFrequencyHz),
+        a.clamp(0.0, 1.0),
+      );
+      if (i < steps) {
+        await Future<void>.delayed(Duration(milliseconds: stepMs));
+      }
+    }
+    engine.setTargetFrequency(baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz));
+    engine.setAmplitude(0.0);
+    _lastVoiceFreq = baseFreq;
+    _lastVoiceAmp = 0.0;
+    _onModulatedVoiceOutput?.call(baseFreq, 0.0);
   }
   
   void stopSession() {
@@ -314,6 +448,10 @@ class TherapySessionController {
      final double currentIntensity = intensity.value;
      // Keep last-known params; intensity is forced to 0 for stop.
      () async {
+       if (_modulationMode != TherapyModulationMode.none) {
+         await _rampModulatedVoiceEnd(token);
+       }
+
        await _rampTherapyUpdate(
          token: token,
          duration: _toggleFadeDuration,
