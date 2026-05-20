@@ -408,6 +408,19 @@ class TherapySessionController {
     _onModulatedVoiceOutput?.call(freqOut, ampOut);
   }
 
+  /// Restores the voice-path frequency/amplitude used when therapy DSP is idle.
+  /// After a session fade-out the engine can be left at zero; the next start
+  /// reads [baseAmp] from the runtime notifier.
+  void _restoreIdleVoiceOutput() {
+    final double restoredFreq = baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz);
+    final double restoredAmp = baseAmp.clamp(0.0, 1.0);
+    engine.setTargetFrequency(restoredFreq);
+    engine.setAmplitude(restoredAmp);
+    _lastVoiceFreq = restoredFreq;
+    _lastVoiceAmp = restoredAmp;
+    _onModulatedVoiceOutput?.call(restoredFreq, restoredAmp);
+  }
+
   Future<void> _rampModulatedVoiceEnd(int token) async {
     const int steps = 12;
     const int stepMs = 6;
@@ -427,11 +440,7 @@ class TherapySessionController {
         await Future<void>.delayed(Duration(milliseconds: stepMs));
       }
     }
-    engine.setTargetFrequency(baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz));
-    engine.setAmplitude(0.0);
-    _lastVoiceFreq = baseFreq;
-    _lastVoiceAmp = 0.0;
-    _onModulatedVoiceOutput?.call(baseFreq, 0.0);
+    _restoreIdleVoiceOutput();
   }
   
   void stopSession() {
@@ -488,6 +497,7 @@ class TherapySessionController {
          debugPrint('SupportSession: engine stop returned error $stopResult');
        }
        engine.stop();
+       _restoreIdleVoiceOutput();
        isRunning.value = false;
        currentPhase.value = TherapyPhase.idle;
        didComplete.value = reason == TherapyStopReason.completed;
