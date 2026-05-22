@@ -5,6 +5,12 @@ void SubthresholdModule::init(double sampleRate) {
     fmOsc_.setTargetFrequency(3.0); // 3 Hz FM
 }
 
+void SubthresholdModule::resetPhases() {
+  mainOsc_.resetPhase();
+  amOsc_.resetPhase();
+  fmOsc_.resetPhase();
+}
+
 float SubthresholdModule::process(double baseFreq, float baseAmp) {
     float amVal = amOsc_.process();
     float fmVal = fmOsc_.process();

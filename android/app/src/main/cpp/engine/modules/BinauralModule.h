@@ -10,6 +10,7 @@ struct StereoSample {
 class BinauralModule {
 public:
   void init(double sampleRate);
+  void resetPhases();
   StereoSample process(double baseFreq, float baseAmp, float binauralOffset);
 
 private:

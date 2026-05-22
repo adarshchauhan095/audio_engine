@@ -23,6 +23,9 @@ public:
   void setFrequency(float hz);
   void setTargetFrequency(double hz);
 
+  /// Resets all voice oscillator phases (clickless session boundaries).
+  void resetPhases();
+
   float process();
 
 private:

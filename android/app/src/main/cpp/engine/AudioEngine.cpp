@@ -5,7 +5,9 @@
 
 namespace {
 constexpr float kAmplitudeSmoothingMs = 8.0f;
-constexpr float kTransportRampMs = 20.0f;
+constexpr float kTransportRampMs = 30.0f;
+constexpr float kTherapySessionFadeMs = 50.0f;
+constexpr float kTherapyStopSilenceThreshold = 0.001f;
 } // namespace
 
 AudioEngine::~AudioEngine() {
@@ -102,6 +104,10 @@ bool AudioEngine::start() {
   transportSmoother_.reset(0.0f);
   transportSmoother_.setTarget(1.0f);
 
+  therapySessionGainSmoother_.setSmoothingTimeMs(
+      kTherapySessionFadeMs, static_cast<float>(stream_->getSampleRate()));
+  voiceManager_.resetPhases();
+
   if (stream_->requestStart() != oboe::Result::OK) {
     stream_->close();
     stream_.reset();
@@ -160,8 +166,17 @@ void AudioEngine::setStereoEnabled(bool enabled) {
   stereoEnabled_.store(enabled, std::memory_order_relaxed);
 }
 
+void AudioEngine::finalizeTherapyStopLocked() {
+  TherapyConfig emptyConfig;
+  therapyRouter_.updateConfig(emptyConfig);
+  therapySessionActive_.store(false, std::memory_order_release);
+  therapyStopPending_.store(false, std::memory_order_release);
+}
+
 int AudioEngine::therapyStart(const TherapyConfig &config) {
   std::lock_guard<std::mutex> lock(mutex_);
+  therapyStopPending_.store(false, std::memory_order_release);
+
   const float sr = stream_ ? static_cast<float>(stream_->getSampleRate()) : 48000.0f;
   // IMPORTANT: Do not re-init the router on every start; that can introduce
   // discontinuities (pops/squeaks) when the user toggles therapy rapidly.
@@ -169,7 +184,16 @@ int AudioEngine::therapyStart(const TherapyConfig &config) {
   if (therapyRouterSampleRate_ <= 0.0f || std::fabs(therapyRouterSampleRate_ - sr) > 1e-3f) {
     therapyRouter_.init(sr);
     therapyRouterSampleRate_ = sr;
+    therapySessionGainSmoother_.setSmoothingTimeMs(kTherapySessionFadeMs, sr);
   }
+
+  voiceManager_.resetPhases();
+  therapyRouter_.resetAllModulePhases();
+
+  therapySessionGainSmoother_.reset(0.0f);
+  therapySessionGainSmoother_.setTarget(1.0f);
+  therapySessionActive_.store(true, std::memory_order_release);
+
   therapyRouter_.updateConfig(config);
   log("Therapy started");
   return 1;
@@ -184,9 +208,14 @@ int AudioEngine::therapyUpdate(const TherapyConfig &config) {
 
 int AudioEngine::therapyStop() {
   std::lock_guard<std::mutex> lock(mutex_);
-  TherapyConfig emptyConfig;
-  therapyRouter_.updateConfig(emptyConfig);
-  log("Therapy stopped");
+  if (!therapySessionActive_.load(std::memory_order_acquire)) {
+    finalizeTherapyStopLocked();
+    log("Therapy stopped");
+    return 1;
+  }
+  therapyStopPending_.store(true, std::memory_order_release);
+  therapySessionGainSmoother_.setTarget(0.0f);
+  log("Therapy stopping (fade out)");
   return 1;
 }
 
@@ -237,9 +266,14 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
     }
   }
 
+  const bool therapySession =
+      therapySessionActive_.load(std::memory_order_acquire);
+
   for (int32_t i = 0; i < numFrames; ++i) {
     const float transport = transportSmoother_.process();
     const float amp = amplitudeSmoother_.process();
+    const float sessionGain =
+        therapySession ? therapySessionGainSmoother_.process() : 1.0f;
 
     float left = 0.0f;
     float right = 0.0f;
@@ -251,8 +285,8 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         sr.left = mono;
         sr.right = mono;
       }
-      left = sr.left * transport;
-      right = sr.right * transport;
+      left = sr.left * sessionGain * transport;
+      right = sr.right * sessionGain * transport;
       voiceManager_.process();
     } else if (therapyRouter_.isActive()) {
       StereoSample sr = therapyRouter_.process();
@@ -261,13 +295,25 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         sr.left = mono;
         sr.right = mono;
       }
-      left = sr.left * transport;
-      right = sr.right * transport;
+      left = sr.left * sessionGain * transport;
+      right = sr.right * sessionGain * transport;
       voiceManager_.process();
     } else {
-      const float mono = transport * amp * voiceManager_.process();
+      const float mono =
+          sessionGain * transport * amp * voiceManager_.process();
       left = mono;
       right = mono;
+    }
+
+    if (therapyStopPending_.load(std::memory_order_acquire) &&
+        sessionGain < kTherapyStopSilenceThreshold) {
+      bool pending = true;
+      if (therapyStopPending_.compare_exchange_strong(
+              pending, false, std::memory_order_acq_rel)) {
+        TherapyConfig emptyConfig;
+        therapyRouter_.updateConfig(emptyConfig);
+        therapySessionActive_.store(false, std::memory_order_release);
+      }
     }
 
     const size_t base = static_cast<size_t>(i) * static_cast<size_t>(channelCount);

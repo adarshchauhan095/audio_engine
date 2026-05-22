@@ -14,18 +14,29 @@ void TherapyRouter::init(double sampleRate) {
   pipGainSmoother_.setSmoothingTimeMs(20.0f, sampleRate_);
   sidebandsGainSmoother_.setSmoothingTimeMs(20.0f, sampleRate_);
   binauralGainSmoother_.setSmoothingTimeMs(20.0f, sampleRate_);
+  intensitySmoother_.setSmoothingTimeMs(80.0f, sampleRate_);
 
   subthresholdGainSmoother_.reset(0.0f);
   rmpGainSmoother_.reset(0.0f);
   pipGainSmoother_.reset(0.0f);
   sidebandsGainSmoother_.reset(0.0f);
   binauralGainSmoother_.reset(0.0f);
+  intensitySmoother_.reset(0.0f);
+}
+
+void TherapyRouter::resetAllModulePhases() {
+  subthreshold_.resetPhases();
+  rmp_.reset();
+  pip_.reset();
+  sidebands_.resetPhases();
+  binaural_.resetPhases();
 }
 
 void TherapyRouter::updateConfig(const TherapyConfig &config) {
   bool wasActive = isActive();
   const TherapyConfig prev = config_;
   config_ = config;
+  intensitySmoother_.setTarget(config_.therapyIntensity);
   enableSubthreshold_.store(config_.enableSubthreshold, std::memory_order_release);
   enableRMP_.store(config_.enableRMP, std::memory_order_release);
   enablePIP_.store(config_.enablePIP, std::memory_order_release);
@@ -93,7 +104,8 @@ StereoSample TherapyRouter::process() {
 
   const double baseFreq = config_.baseFreq;
   const float baseAmp = config_.baseAmp;
-  float amp = baseAmp * config_.therapyIntensity;
+  const float intensity = intensitySmoother_.process();
+  float amp = baseAmp * intensity;
 
   const float subM = subthresholdGainSmoother_.process();
   if (subM > 0.0f) {

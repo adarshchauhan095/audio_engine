@@ -17,6 +17,9 @@ public:
   /// Generates the next audio sample.
   float process();
 
+  /// Aligns phase to zero to avoid discontinuities when starting playback.
+  void resetPhase();
+
 private:
   std::atomic<double> frequencyTarget_{440.0};
   double frequencyCurrent_ = 440.0;

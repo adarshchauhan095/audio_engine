@@ -14,6 +14,7 @@ class TherapyRouter {
 public:
     void init(double sampleRate);
     void updateConfig(const TherapyConfig& config);
+    void resetAllModulePhases();
     bool isActive() const;
 
     StereoSample process();
@@ -25,6 +26,7 @@ private:
     ParameterSmoother pipGainSmoother_;
     ParameterSmoother sidebandsGainSmoother_;
     ParameterSmoother binauralGainSmoother_;
+    ParameterSmoother intensitySmoother_;
 
     TherapyConfig config_;
     std::atomic<bool> enableSubthreshold_{false};

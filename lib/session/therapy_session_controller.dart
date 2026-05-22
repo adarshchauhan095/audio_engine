@@ -38,6 +38,10 @@ class TherapySessionController {
   int _smoothingToken = 0;
   static const Duration _toggleFadeDuration = Duration(milliseconds: 40);
   static const Duration _paramSlewDuration = Duration(milliseconds: 20);
+  static const Duration _voiceRampDuration = Duration(milliseconds: 50);
+  /// Matches native [kTherapySessionFadeMs] before [engine.stop].
+  static const Duration _nativeSessionFadeWait = Duration(milliseconds: 60);
+  static const Duration _transportFadeWait = Duration(milliseconds: 35);
   
   // configurable profile
   bool subthreshold = false;
@@ -210,12 +214,19 @@ class TherapySessionController {
       
       remainingSeconds.value = totalSecondsConfigured;
       _endTime = DateTime.now().add(Duration(seconds: totalSecondsConfigured));
-      
-      // Ensure engine is running
+
+      // Clickless start: align phase at zero level before transport/therapy fade-in.
+      final double startFreq = baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz);
+      engine.setTargetFrequency(startFreq);
+      engine.setAmplitude(0.0);
+      _lastVoiceFreq = startFreq;
+      _lastVoiceAmp = 0.0;
+      _onModulatedVoiceOutput?.call(startFreq, 0.0);
+
       if (!engine.isRunning) {
         engine.start();
       }
-      
+
       int startResult = engine.therapyStart(
         subthreshold: subthreshold,
         rmp: rmp,
@@ -244,7 +255,7 @@ class TherapySessionController {
         );
       }
 
-      _applyModulatedVoiceIfNeeded();
+      _applyCoreVoiceOutput();
 
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(milliseconds: 200), _onTick);
@@ -353,7 +364,7 @@ class TherapySessionController {
       );
     }
 
-    _applyModulatedVoiceIfNeeded();
+    _applyCoreVoiceOutput();
   }
 
   void _tickNbnNoise() {
@@ -365,14 +376,25 @@ class TherapySessionController {
     _nbnNoiseState = _nbnNoiseState.clamp(-1.0, 1.0);
   }
 
-  /// Phase-2 modulation on the voice path (core envelope × modulation).
-  void _applyModulatedVoiceIfNeeded() {
-    if (_modulationMode == TherapyModulationMode.none) return;
+  /// Voice-path output: Phase-1 core envelope, or Phase-2 envelope × modulation.
+  void _applyCoreVoiceOutput() {
     if (_sessionStartedAt == null) return;
+
+    final double i = intensity.value.clamp(0.0, 1.0);
+
+    if (_modulationMode == TherapyModulationMode.none) {
+      final double freqOut = baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz);
+      final double ampOut = (baseAmp * i).clamp(0.0, 1.0);
+      engine.setTargetFrequency(freqOut);
+      engine.setAmplitude(ampOut);
+      _lastVoiceFreq = freqOut;
+      _lastVoiceAmp = ampOut;
+      _onModulatedVoiceOutput?.call(freqOut, ampOut);
+      return;
+    }
 
     final double t =
         DateTime.now().difference(_sessionStartedAt!).inMicroseconds / 1e6;
-    final double i = intensity.value.clamp(0.0, 1.0);
 
     double freqOut = baseFreq;
     double ampOut;
@@ -408,39 +430,49 @@ class TherapySessionController {
     _onModulatedVoiceOutput?.call(freqOut, ampOut);
   }
 
-  /// Restores the voice-path frequency/amplitude used when therapy DSP is idle.
-  /// After a session fade-out the engine can be left at zero; the next start
-  /// reads [baseAmp] from the runtime notifier.
-  void _restoreIdleVoiceOutput() {
+  /// Restores UI/runtime base frequency and amplitude after a session ends.
+  /// Skips pushing amplitude to the engine while transport is fading to avoid
+  /// a stop-click.
+  void _restoreIdleVoiceOutput({bool updateEngine = true}) {
     final double restoredFreq = baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz);
     final double restoredAmp = baseAmp.clamp(0.0, 1.0);
-    engine.setTargetFrequency(restoredFreq);
-    engine.setAmplitude(restoredAmp);
+    if (updateEngine) {
+      engine.setTargetFrequency(restoredFreq);
+      engine.setAmplitude(restoredAmp);
+    }
     _lastVoiceFreq = restoredFreq;
     _lastVoiceAmp = restoredAmp;
     _onModulatedVoiceOutput?.call(restoredFreq, restoredAmp);
   }
 
-  Future<void> _rampModulatedVoiceEnd(int token) async {
-    const int steps = 12;
-    const int stepMs = 6;
-    final double f0 = _lastVoiceFreq;
+  Future<void> _rampVoiceToSilence(int token) async {
+    const int steps = 10;
+    final int stepMs =
+        (_voiceRampDuration.inMilliseconds / steps).clamp(1, 1000).toInt();
+    final double f0 = _lastVoiceFreq > 0 ? _lastVoiceFreq : baseFreq;
+    final double a0 = _lastVoiceAmp;
     for (int i = 0; i <= steps; i++) {
       if (token != _smoothingToken) return;
       final double u = i / steps;
-      final double a = _lastVoiceAmp * (1.0 - u);
+      final double a = a0 * (1.0 - u);
       final double f = f0 + (baseFreq - f0) * u;
-      engine.setTargetFrequency(f.clamp(kMinFrequencyHz, kMaxFrequencyHz));
-      engine.setAmplitude(a.clamp(0.0, 1.0));
-      _onModulatedVoiceOutput?.call(
-        f.clamp(kMinFrequencyHz, kMaxFrequencyHz),
-        a.clamp(0.0, 1.0),
-      );
+      final double fClamped = f.clamp(kMinFrequencyHz, kMaxFrequencyHz);
+      final double aClamped = a.clamp(0.0, 1.0);
+      engine.setTargetFrequency(fClamped);
+      engine.setAmplitude(aClamped);
+      _onModulatedVoiceOutput?.call(fClamped, aClamped);
       if (i < steps) {
         await Future<void>.delayed(Duration(milliseconds: stepMs));
       }
     }
-    _restoreIdleVoiceOutput();
+    engine.setTargetFrequency(baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz));
+    engine.setAmplitude(0.0);
+    _lastVoiceFreq = baseFreq;
+    _lastVoiceAmp = 0.0;
+    _onModulatedVoiceOutput?.call(
+      baseFreq.clamp(kMinFrequencyHz, kMaxFrequencyHz),
+      0.0,
+    );
   }
   
   void stopSession() {
@@ -457,9 +489,7 @@ class TherapySessionController {
      final double currentIntensity = intensity.value;
      // Keep last-known params; intensity is forced to 0 for stop.
      () async {
-       if (_modulationMode != TherapyModulationMode.none) {
-         await _rampModulatedVoiceEnd(token);
-       }
+       await _rampVoiceToSilence(token);
 
        await _rampTherapyUpdate(
          token: token,
@@ -496,8 +526,13 @@ class TherapySessionController {
        if (stopResult < 0) {
          debugPrint('SupportSession: engine stop returned error $stopResult');
        }
+
+       // Let native session-gain and transport fades complete before restoring.
+       await Future<void>.delayed(_nativeSessionFadeWait);
        engine.stop();
-       _restoreIdleVoiceOutput();
+       await Future<void>.delayed(_transportFadeWait);
+
+       _restoreIdleVoiceOutput(updateEngine: false);
        isRunning.value = false;
        currentPhase.value = TherapyPhase.idle;
        didComplete.value = reason == TherapyStopReason.completed;

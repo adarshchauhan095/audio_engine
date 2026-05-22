@@ -32,6 +32,10 @@ void Oscillator::setTargetFrequency(double hz) {
   frequencyTarget_.store(sanitizeFrequency(hz), std::memory_order_relaxed);
 }
 
+void Oscillator::resetPhase() {
+  phase_ = 0.0;
+}
+
 float Oscillator::process() {
   if (smoothingCoeff_ == 0.0) {
     smoothingCoeff_ = smoothingCoeffForMs(kFrequencySmoothingMs, kSampleRate);

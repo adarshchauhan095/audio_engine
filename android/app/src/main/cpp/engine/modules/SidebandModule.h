@@ -5,6 +5,7 @@
 class SidebandModule {
 public:
   void init(double sampleRate);
+  void resetPhases();
   float process(double baseFreq, float baseAmp, float sidebandOffset,
                 float sidebandIntensity);
 

@@ -6,6 +6,7 @@
 class SubthresholdModule {
 public:
     void init(double sampleRate);
+    void resetPhases();
     float process(double baseFreq, float baseAmp);
 
 private:

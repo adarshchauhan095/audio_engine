@@ -78,6 +78,7 @@ private:
   EventScheduler eventScheduler_;
   ParameterSmoother amplitudeSmoother_;
   ParameterSmoother transportSmoother_;
+  ParameterSmoother therapySessionGainSmoother_;
   TherapyRouter therapyRouter_;
   Phase2Router phase2Router_;
 
@@ -88,9 +89,12 @@ private:
   std::atomic<int32_t> preferredDeviceId_{-1};
   float therapyRouterSampleRate_ = 0.0f;
   float phase2RouterSampleRate_ = 0.0f;
+  std::atomic<bool> therapySessionActive_{false};
+  std::atomic<bool> therapyStopPending_{false};
   LogCallback logCb_ = nullptr;
   OutputLostCallback outputLostCb_ = nullptr;
 
+  void finalizeTherapyStopLocked();
   void log(const char *msg) {
     if (logCb_)
       logCb_(msg);

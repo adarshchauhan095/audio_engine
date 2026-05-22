@@ -27,6 +27,13 @@ void VoiceManager::setTargetFrequency(double hz) {
   }
 }
 
+void VoiceManager::resetPhases() {
+  const uint32_t count = activeVoiceCount();
+  for (uint32_t i = 0; i < count; ++i) {
+    voices_[i].resetPhase();
+  }
+}
+
 float VoiceManager::process() {
   const uint32_t count = activeVoiceCount();
   double sum = 0.0;

@@ -2,6 +2,12 @@
 
 void SidebandModule::init(double sampleRate) {}
 
+void SidebandModule::resetPhases() {
+  lowerSideband_.resetPhase();
+  upperSideband_.resetPhase();
+  mainOsc_.resetPhase();
+}
+
 float SidebandModule::process(double baseFreq, float baseAmp,
                               float sidebandOffset, float sidebandIntensity) {
   lowerSideband_.setTargetFrequency(baseFreq - sidebandOffset);

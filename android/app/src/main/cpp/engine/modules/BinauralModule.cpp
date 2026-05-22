@@ -2,6 +2,11 @@
 
 void BinauralModule::init(double sampleRate) {}
 
+void BinauralModule::resetPhases() {
+  leftOsc_.resetPhase();
+  rightOsc_.resetPhase();
+}
+
 StereoSample BinauralModule::process(double baseFreq, float baseAmp,
                                      float binauralOffset) {
   leftOsc_.setTargetFrequency(baseFreq);
