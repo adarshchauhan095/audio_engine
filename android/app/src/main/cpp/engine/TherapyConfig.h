@@ -28,4 +28,13 @@ struct TherapyConfig {
 
   // Binaural
   float binauralOffset = 5.0f;
+
+  /// Silent, all-modules-off config for session teardown (avoids default intensity
+  /// snapping back to 0.5 and causing a stop click).
+  static TherapyConfig inactive() {
+    TherapyConfig c;
+    c.therapyIntensity = 0.0f;
+    c.baseAmp = 0.0f;
+    return c;
+  }
 };

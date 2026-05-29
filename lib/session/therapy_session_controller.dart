@@ -487,6 +487,12 @@ class TherapySessionController {
      // Smoothly fade down therapy intensity before disabling DSP + transport.
      final int token = ++_smoothingToken;
      final double currentIntensity = intensity.value;
+     final double currentRmpDepth = maxIntensity > 0
+         ? targetRmpDepth * (currentIntensity / maxIntensity)
+         : 0.0;
+     final double currentSidebandIntensity = maxIntensity > 0
+         ? targetSidebandIntensity * (currentIntensity / maxIntensity)
+         : 0.0;
      // Keep last-known params; intensity is forced to 0 for stop.
      () async {
        await _rampVoiceToSilence(token);
@@ -505,8 +511,8 @@ class TherapySessionController {
          baseFreqTo: baseFreq,
          baseAmpFrom: baseAmp,
          baseAmpTo: baseAmp,
-         rmpDepthFrom: targetRmpDepth,
-         rmpDepthTo: targetRmpDepth,
+         rmpDepthFrom: currentRmpDepth,
+         rmpDepthTo: 0.0,
          rmpRateFrom: targetRmpRate,
          rmpRateTo: targetRmpRate,
          pipIntervalFrom: targetPipInterval,
@@ -515,8 +521,8 @@ class TherapySessionController {
          pipDurationTo: targetPipDuration,
          sidebandOffsetFrom: targetSidebandOffset,
          sidebandOffsetTo: targetSidebandOffset,
-         sidebandIntensityFrom: targetSidebandIntensity,
-         sidebandIntensityTo: targetSidebandIntensity,
+         sidebandIntensityFrom: currentSidebandIntensity,
+         sidebandIntensityTo: 0.0,
          binauralOffsetFrom: targetBinauralOffset,
          binauralOffsetTo: targetBinauralOffset,
        );

@@ -15,6 +15,8 @@ public:
     void init(double sampleRate);
     void updateConfig(const TherapyConfig& config);
     void resetAllModulePhases();
+    /// Zero module enable gains before a new session fade-in.
+    void resetModuleGains();
     bool isActive() const;
 
     StereoSample process();
@@ -46,4 +48,7 @@ private:
     // schedule, then fade back in.
     bool pipResetPending_ = false;
     bool pipTargetEnableAfterReset_ = false;
+
+    // Fade binaural out, reset oscillator phases at silence, then release.
+    bool binauralResetPending_ = false;
 };

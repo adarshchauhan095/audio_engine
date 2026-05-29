@@ -32,6 +32,18 @@ void TherapyRouter::resetAllModulePhases() {
   binaural_.resetPhases();
 }
 
+void TherapyRouter::resetModuleGains() {
+  subthresholdGainSmoother_.reset(0.0f);
+  rmpGainSmoother_.reset(0.0f);
+  pipGainSmoother_.reset(0.0f);
+  sidebandsGainSmoother_.reset(0.0f);
+  binauralGainSmoother_.reset(0.0f);
+  intensitySmoother_.reset(0.0f);
+  pipResetPending_ = false;
+  pipTargetEnableAfterReset_ = false;
+  binauralResetPending_ = false;
+}
+
 void TherapyRouter::updateConfig(const TherapyConfig &config) {
   bool wasActive = isActive();
   const TherapyConfig prev = config_;
@@ -46,7 +58,16 @@ void TherapyRouter::updateConfig(const TherapyConfig &config) {
   subthresholdGainSmoother_.setTarget(config_.enableSubthreshold ? 1.0f : 0.0f);
   rmpGainSmoother_.setTarget(config_.enableRMP ? 1.0f : 0.0f);
   sidebandsGainSmoother_.setTarget(config_.enableSidebands ? 1.0f : 0.0f);
-  binauralGainSmoother_.setTarget(config_.enableBinaural ? 1.0f : 0.0f);
+
+  if (config_.enableBinaural) {
+    binauralResetPending_ = false;
+    binauralGainSmoother_.setTarget(1.0f);
+  } else if (prev.enableBinaural) {
+    binauralResetPending_ = true;
+    binauralGainSmoother_.setTarget(0.0f);
+  } else if (!binauralResetPending_) {
+    binauralGainSmoother_.setTarget(0.0f);
+  }
 
   // PIP gain is special-cased to allow clickless resets on parameter changes.
   // Default: follow enabled state.
@@ -60,6 +81,9 @@ void TherapyRouter::updateConfig(const TherapyConfig &config) {
     pip_.reset();
     pipResetPending_ = false;
     pipTargetEnableAfterReset_ = false;
+    if (!binauralResetPending_) {
+      binaural_.resetPhases();
+    }
   }
 
   // If PIP parameters change while PIP is enabled, schedule a clickless reset:
@@ -99,6 +123,14 @@ StereoSample TherapyRouter::process() {
       pipResetPending_ = false;
       pipGainSmoother_.setTarget(pipTargetEnableAfterReset_ ? 1.0f : 0.0f);
       pipTargetEnableAfterReset_ = false;
+    }
+  }
+
+  if (binauralResetPending_) {
+    const float binNow = binauralGainSmoother_.current();
+    if (binNow < 0.001f) {
+      binaural_.resetPhases();
+      binauralResetPending_ = false;
     }
   }
 

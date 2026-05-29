@@ -26,7 +26,7 @@ void RMPModule::reset() {
   samplesUntilNextJitter_ = 0;
   freqJitter_ = 0.0;
   ampJitter_ = 0.0f;
-  smoothedAmp_ = -1.0f;
+  smoothedAmp_ = 0.0f;
 }
 
 float RMPModule::process(double baseFreq, float baseAmp, float rmpDepth,
@@ -59,12 +59,8 @@ float RMPModule::process(double baseFreq, float baseAmp, float rmpDepth,
   if (targetAmp > 1.0f)
     targetAmp = 1.0f;
 
-  if (smoothedAmp_ < 0.0f) {
-    smoothedAmp_ = targetAmp;
-  } else {
-    smoothedAmp_ =
-        targetAmp + ampSmoothCoeff_ * (smoothedAmp_ - targetAmp);
-  }
+  smoothedAmp_ =
+      targetAmp + ampSmoothCoeff_ * (smoothedAmp_ - targetAmp);
 
   return mainOsc_.process() * smoothedAmp_;
 }

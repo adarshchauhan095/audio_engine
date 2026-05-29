@@ -167,8 +167,7 @@ void AudioEngine::setStereoEnabled(bool enabled) {
 }
 
 void AudioEngine::finalizeTherapyStopLocked() {
-  TherapyConfig emptyConfig;
-  therapyRouter_.updateConfig(emptyConfig);
+  therapyRouter_.updateConfig(TherapyConfig::inactive());
   therapySessionActive_.store(false, std::memory_order_release);
   therapyStopPending_.store(false, std::memory_order_release);
 }
@@ -189,6 +188,7 @@ int AudioEngine::therapyStart(const TherapyConfig &config) {
 
   voiceManager_.resetPhases();
   therapyRouter_.resetAllModulePhases();
+  therapyRouter_.resetModuleGains();
 
   therapySessionGainSmoother_.reset(0.0f);
   therapySessionGainSmoother_.setTarget(1.0f);
@@ -310,8 +310,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
       bool pending = true;
       if (therapyStopPending_.compare_exchange_strong(
               pending, false, std::memory_order_acq_rel)) {
-        TherapyConfig emptyConfig;
-        therapyRouter_.updateConfig(emptyConfig);
+        therapyRouter_.updateConfig(TherapyConfig::inactive());
         therapySessionActive_.store(false, std::memory_order_release);
       }
     }
