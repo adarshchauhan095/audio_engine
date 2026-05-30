@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/screens/phase3_modules_screen.dart';
+import 'ui/screens/therapy_entry_screen.dart';
 
 final RouteObserver<PageRoute<dynamic>> routeObserver =
     RouteObserver<PageRoute<dynamic>>();
@@ -43,8 +43,8 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       navigatorObservers: [routeObserver],
-      // Phase 3 dev entry — switch to TherapyEntryScreen when merging phases 1–3.
-      home: const Phase3ModulesScreen(),
+      // Unified launcher: Phases 1–4 (+ future phases via TherapyEntryScreen).
+      home: const TherapyEntryScreen(),
     );
   }
 }

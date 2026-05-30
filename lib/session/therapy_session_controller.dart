@@ -36,6 +36,11 @@ class TherapySessionController {
   DateTime? _endTime;
   bool _stopRequested = false;
   int _smoothingToken = 0;
+
+  /// When true, step completion is delegated to [onFlowStepElapsed] (Phase 4).
+  bool flowOrchestrated = false;
+  Future<void> Function()? onFlowStepElapsed;
+  bool _flowStepAdvanceInProgress = false;
   static const Duration _toggleFadeDuration = Duration(milliseconds: 40);
   static const Duration _paramSlewDuration = Duration(milliseconds: 20);
   static const Duration _voiceRampDuration = Duration(milliseconds: 50);
@@ -275,9 +280,22 @@ class TherapySessionController {
      int remain = _endTime!.difference(now).inSeconds;
      
      if (remain <= 0) {
-       _stopSession(reason: TherapyStopReason.completed);
+       if (flowOrchestrated &&
+           onFlowStepElapsed != null &&
+           !_flowStepAdvanceInProgress) {
+         _flowStepAdvanceInProgress = true;
+         unawaited(() async {
+           try {
+             await onFlowStepElapsed!();
+           } finally {
+             _flowStepAdvanceInProgress = false;
+           }
+         }());
+       } else if (!flowOrchestrated) {
+         _stopSession(reason: TherapyStopReason.completed);
+       }
        return;
-     } // keep going until 0
+     }
      
      remainingSeconds.value = remain;
      int elapsed = (warmupDuration + mainDuration + cooldownDuration) - remain;
@@ -550,7 +568,248 @@ class TherapySessionController {
   void resetCompletion() {
     didComplete.value = false;
   }
-  
+
+  void clearFlowOrchestration() {
+    flowOrchestrated = false;
+    onFlowStepElapsed = null;
+    _flowStepAdvanceInProgress = false;
+  }
+
+  /// 150 ms fade-out → module switch at silence → 150 ms fade-in (Flow Engine).
+  Future<bool> transitionModulesForFlow({
+    required Duration fadeDuration,
+    required bool subthreshold,
+    required bool rmp,
+    required bool pip,
+    required bool sidebands,
+    required bool binaural,
+    required double baseFreq,
+    required double baseAmp,
+    required double maxIntensity,
+    required double targetRmpDepth,
+    required double targetRmpRate,
+    required double targetPipInterval,
+    required double targetPipDuration,
+    required double targetSidebandOffset,
+    required double targetSidebandIntensity,
+    required double targetBinauralOffset,
+  }) async {
+    if (_stopRequested || !isRunning.value) return false;
+
+    final bool oldSub = this.subthreshold;
+    final bool oldRmp = this.rmp;
+    final bool oldPip = this.pip;
+    final bool oldSss = this.sidebands;
+    final bool oldBin = this.binaural;
+    final double oldBaseFreq = this.baseFreq;
+    final double oldBaseAmp = this.baseAmp;
+    final double oldRmpDepth = this.targetRmpDepth;
+    final double oldRmpRate = this.targetRmpRate;
+    final double oldPipInterval = this.targetPipInterval;
+    final double oldPipDuration = this.targetPipDuration;
+    final double oldSidebandOffset = this.targetSidebandOffset;
+    final double oldSidebandIntensity = this.targetSidebandIntensity;
+    final double oldBinauralOffset = this.targetBinauralOffset;
+    final double currentIntensity = intensity.value;
+    final double maxI = this.maxIntensity;
+    final double phaseRatio =
+        maxI <= 0.0 ? 0.0 : (currentIntensity / maxI).clamp(0.0, 1.0);
+
+    final int token = ++_smoothingToken;
+
+    await _rampTherapyUpdate(
+      token: token,
+      duration: fadeDuration,
+      subthreshold: oldSub,
+      rmp: oldRmp,
+      pip: oldPip,
+      sidebands: oldSss,
+      binaural: oldBin,
+      intensityFrom: currentIntensity,
+      intensityTo: 0.0,
+      baseFreqFrom: oldBaseFreq,
+      baseFreqTo: oldBaseFreq,
+      baseAmpFrom: oldBaseAmp,
+      baseAmpTo: oldBaseAmp,
+      rmpDepthFrom: oldRmpDepth * phaseRatio,
+      rmpDepthTo: 0.0,
+      rmpRateFrom: oldRmpRate,
+      rmpRateTo: oldRmpRate,
+      pipIntervalFrom: oldPipInterval,
+      pipIntervalTo: oldPipInterval,
+      pipDurationFrom: oldPipDuration,
+      pipDurationTo: oldPipDuration,
+      sidebandOffsetFrom: oldSidebandOffset,
+      sidebandOffsetTo: oldSidebandOffset,
+      sidebandIntensityFrom: oldSidebandIntensity * phaseRatio,
+      sidebandIntensityTo: 0.0,
+      binauralOffsetFrom: oldBinauralOffset,
+      binauralOffsetTo: oldBinauralOffset,
+    );
+
+    if (token != _smoothingToken || _stopRequested) return false;
+
+    this.subthreshold = subthreshold;
+    this.rmp = rmp;
+    this.pip = pip;
+    this.sidebands = sidebands;
+    this.binaural = binaural;
+    this.baseFreq = baseFreq;
+    this.baseAmp = baseAmp;
+    this.maxIntensity = maxIntensity;
+    this.targetRmpDepth = targetRmpDepth;
+    this.targetRmpRate = targetRmpRate;
+    this.targetPipInterval = targetPipInterval;
+    this.targetPipDuration = targetPipDuration;
+    this.targetSidebandOffset = targetSidebandOffset;
+    this.targetSidebandIntensity = targetSidebandIntensity;
+    this.targetBinauralOffset = targetBinauralOffset;
+
+    intensity.value = 0.0;
+    currentPhase.value = TherapyPhase.warmup;
+
+    await _rampTherapyUpdate(
+      token: token,
+      duration: fadeDuration,
+      subthreshold: subthreshold,
+      rmp: rmp,
+      pip: pip,
+      sidebands: sidebands,
+      binaural: binaural,
+      intensityFrom: 0.0,
+      intensityTo: 0.0,
+      baseFreqFrom: baseFreq,
+      baseFreqTo: baseFreq,
+      baseAmpFrom: baseAmp,
+      baseAmpTo: baseAmp,
+      rmpDepthFrom: 0.0,
+      rmpDepthTo: 0.0,
+      rmpRateFrom: targetRmpRate,
+      rmpRateTo: targetRmpRate,
+      pipIntervalFrom: targetPipInterval,
+      pipIntervalTo: targetPipInterval,
+      pipDurationFrom: targetPipDuration,
+      pipDurationTo: targetPipDuration,
+      sidebandOffsetFrom: targetSidebandOffset,
+      sidebandOffsetTo: targetSidebandOffset,
+      sidebandIntensityFrom: 0.0,
+      sidebandIntensityTo: 0.0,
+      binauralOffsetFrom: targetBinauralOffset,
+      binauralOffsetTo: targetBinauralOffset,
+    );
+
+    if (token == _smoothingToken) _smoothingToken = 0;
+    return !_stopRequested;
+  }
+
+  /// Starts the next orchestrated step without tearing down transport/DSP.
+  /// Final flow fade-out (150 ms) then normal session stop.
+  Future<void> completeFlowAndStop({
+    Duration fadeDuration = const Duration(milliseconds: 150),
+  }) async {
+    if (!isRunning.value) {
+      clearFlowOrchestration();
+      return;
+    }
+    clearFlowOrchestration();
+    _timer?.cancel();
+    _timer = null;
+
+    final int token = ++_smoothingToken;
+    final double currentIntensity = intensity.value;
+    final double maxI = maxIntensity;
+    final double phaseRatio =
+        maxI <= 0.0 ? 0.0 : (currentIntensity / maxI).clamp(0.0, 1.0);
+
+    await _rampTherapyUpdate(
+      token: token,
+      duration: fadeDuration,
+      subthreshold: subthreshold,
+      rmp: rmp,
+      pip: pip,
+      sidebands: sidebands,
+      binaural: binaural,
+      intensityFrom: currentIntensity,
+      intensityTo: 0.0,
+      baseFreqFrom: baseFreq,
+      baseFreqTo: baseFreq,
+      baseAmpFrom: baseAmp,
+      baseAmpTo: baseAmp,
+      rmpDepthFrom: targetRmpDepth * phaseRatio,
+      rmpDepthTo: 0.0,
+      rmpRateFrom: targetRmpRate,
+      rmpRateTo: targetRmpRate,
+      pipIntervalFrom: targetPipInterval,
+      pipIntervalTo: targetPipInterval,
+      pipDurationFrom: targetPipDuration,
+      pipDurationTo: targetPipDuration,
+      sidebandOffsetFrom: targetSidebandOffset,
+      sidebandOffsetTo: targetSidebandOffset,
+      sidebandIntensityFrom: targetSidebandIntensity * phaseRatio,
+      sidebandIntensityTo: 0.0,
+      binauralOffsetFrom: targetBinauralOffset,
+      binauralOffsetTo: targetBinauralOffset,
+    );
+
+    if (token == _smoothingToken) _smoothingToken = 0;
+    _stopSession(reason: TherapyStopReason.completed);
+  }
+
+  void beginOrchestratedStep({
+    required bool subthreshold,
+    required bool rmp,
+    required bool pip,
+    required bool sidebands,
+    required bool binaural,
+    required double baseFreq,
+    required double baseAmp,
+    required double maxIntensity,
+    required int durationMinutes,
+    required double targetRmpDepth,
+    required double targetRmpRate,
+    required double targetPipInterval,
+    required double targetPipDuration,
+    required double targetSidebandOffset,
+    required double targetSidebandIntensity,
+    required double targetBinauralOffset,
+  }) {
+    _stopRequested = false;
+    didComplete.value = false;
+
+    this.subthreshold = subthreshold;
+    this.rmp = rmp;
+    this.pip = pip;
+    this.sidebands = sidebands;
+    this.binaural = binaural;
+    this.baseFreq = baseFreq;
+    this.baseAmp = baseAmp;
+    this.maxIntensity = maxIntensity;
+    this.targetRmpDepth = targetRmpDepth;
+    this.targetRmpRate = targetRmpRate;
+    this.targetPipInterval = targetPipInterval;
+    this.targetPipDuration = targetPipDuration;
+    this.targetSidebandOffset = targetSidebandOffset;
+    this.targetSidebandIntensity = targetSidebandIntensity;
+    this.targetBinauralOffset = targetBinauralOffset;
+
+    final int totalSecondsConfigured = durationMinutes * 60;
+    warmupDuration = (totalSecondsConfigured * 0.2).round();
+    cooldownDuration = (totalSecondsConfigured * 0.2).round();
+    mainDuration = totalSecondsConfigured - warmupDuration - cooldownDuration;
+
+    intensity.value = 0.0;
+    currentPhase.value = TherapyPhase.warmup;
+    isRunning.value = true;
+    remainingSeconds.value = totalSecondsConfigured;
+    _endTime = DateTime.now().add(Duration(seconds: totalSecondsConfigured));
+    _ticksCount = 0;
+
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(milliseconds: 200), _onTick);
+    _applyTherapyAudioUpdate();
+    _applyCoreVoiceOutput();
+  }
+
   /// Live-updates the current therapy configuration while a session
   /// is running. The phase/timer continues uninterrupted.
   void updatePreset({
