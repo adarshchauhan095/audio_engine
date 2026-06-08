@@ -4,6 +4,7 @@ import 'basic_therapy_screen.dart';
 import 'modulation_therapy_screen.dart';
 import 'flow_selector_screen.dart';
 import 'phase3_modules_screen.dart';
+import 'user_profile_data_screen.dart';
 
 /// Minimal launcher so Phase 1 and Phase 2 stay on separate screens per spec.
 class TherapyEntryScreen extends StatelessWidget {
@@ -12,7 +13,19 @@ class TherapyEntryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('TinnitX')),
+      appBar: AppBar(
+        title: const Text('TinnitX'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const UserProfileDataScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [

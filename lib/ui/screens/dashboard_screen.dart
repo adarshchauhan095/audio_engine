@@ -9,8 +9,9 @@ import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'therapy_session_screen.dart';
 import 'tinnitus_detection_screen.dart';
-import 'ams_matching_screen.dart';
 import 'premium_features_screen.dart';
+import 'user_profile_data_screen.dart';
+import 'ams_matching_screen.dart';
 import '../../hearing_profile_flow/hearing_profile_flow.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -59,6 +60,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('TinnitX'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.person),
+                onPressed: () => _pushScreen(context, const UserProfileDataScreen()),
+              ),
+            ],
           ),
           body: GridView.count(
             crossAxisCount: 2,

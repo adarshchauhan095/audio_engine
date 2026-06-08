@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:audio_engine/ui/onboarding/user_profile_onboarding.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 
@@ -44,7 +45,8 @@ class MyApp extends StatelessWidget {
       ),
       navigatorObservers: [routeObserver],
       // Unified launcher: Phases 1–4 (+ future phases via TherapyEntryScreen).
-      home: const TherapyEntryScreen(),
+      // home: const TherapyEntryScreen(),
+      home: const UserProfileOnboarding(),
     );
   }
 }
