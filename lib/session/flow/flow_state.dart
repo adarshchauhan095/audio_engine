@@ -5,4 +5,6 @@ enum FlowEngineState {
   transitioning,
   finished,
   stopping,
+  feedback,
+  adapt,
 }

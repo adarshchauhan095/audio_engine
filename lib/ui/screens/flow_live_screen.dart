@@ -131,31 +131,23 @@ class _FlowLiveScreenState extends State<FlowLiveScreen> {
         return ValueListenableBuilder<FlowEngineState>(
           valueListenable: _flowEngine.state,
           builder: (BuildContext context, FlowEngineState flowState, _) {
-            if (flowState == FlowEngineState.finished) {
+            if (flowState == FlowEngineState.feedback || flowState == FlowEngineState.adapt) {
               return Scaffold(
                 appBar: AppBar(title: Text(widget.flow.name)),
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Session Completed',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: () {
-                            _flowEngine.resetToIdle();
-                            session.resetCompletion();
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('Back to Start'),
-                        ),
-                      ],
-                    ),
-                  ),
+                body: _FeedbackModal(
+                  onSubmit: (i, c, e) async {
+                    await _flowEngine.submitFeedback(i, c, e);
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  onSkip: () {
+                    _flowEngine.skipFeedback();
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  isAdapting: flowState == FlowEngineState.adapt,
                 ),
               );
             }
@@ -391,3 +383,173 @@ class _FlowLiveScreenState extends State<FlowLiveScreen> {
     );
   }
 }
+
+class _FeedbackModal extends StatefulWidget {
+  const _FeedbackModal({
+    required this.onSubmit,
+    required this.onSkip,
+    required this.isAdapting,
+  });
+
+  final Future<void> Function(
+    IntensityPerception,
+    ComfortLevel,
+    Effectiveness,
+  ) onSubmit;
+  final VoidCallback onSkip;
+  final bool isAdapting;
+
+  @override
+  State<_FeedbackModal> createState() => _FeedbackModalState();
+}
+
+class _FeedbackModalState extends State<_FeedbackModal> {
+  IntensityPerception? _intensity;
+  ComfortLevel? _comfort;
+  Effectiveness? _effectiveness;
+
+  bool get _canSubmit =>
+      _intensity != null && _comfort != null && _effectiveness != null;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.isAdapting) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Adapting parameters...'),
+          ],
+        ),
+      );
+    }
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Card(
+            elevation: 8,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Session Completed',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'How was the flow? Your feedback helps adapt the system.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Question 1: Intensity
+                  Text('1. Intensity perception',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  SegmentedButton<IntensityPerception>(
+                    emptySelectionAllowed: true,
+                    segments: const [
+                      ButtonSegment(
+                          value: IntensityPerception.tooLow, label: Text('TOO LOW')),
+                      ButtonSegment(
+                          value: IntensityPerception.ok, label: Text('OK')),
+                      ButtonSegment(
+                          value: IntensityPerception.tooHigh, label: Text('TOO HIGH')),
+                    ],
+                    selected: _intensity != null ? {_intensity!} : {},
+                    onSelectionChanged: (Set<IntensityPerception> newSelection) {
+                      setState(() {
+                        _intensity = newSelection.first;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Question 2: Comfort
+                  Text('2. Comfort level',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  SegmentedButton<ComfortLevel>(
+                    emptySelectionAllowed: true,
+                    segments: const [
+                      ButtonSegment(
+                          value: ComfortLevel.uncomfortable,
+                          label: Text('UNCOMFORTABLE')),
+                      ButtonSegment(
+                          value: ComfortLevel.neutral, label: Text('NEUTRAL')),
+                      ButtonSegment(
+                          value: ComfortLevel.comfortable,
+                          label: Text('COMFORTABLE')),
+                    ],
+                    selected: _comfort != null ? {_comfort!} : {},
+                    onSelectionChanged: (Set<ComfortLevel> newSelection) {
+                      setState(() {
+                        _comfort = newSelection.first;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Question 3: Effectiveness
+                  Text('3. Effectiveness',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  SegmentedButton<Effectiveness>(
+                    emptySelectionAllowed: true,
+                    segments: const [
+                      ButtonSegment(
+                          value: Effectiveness.low, label: Text('LOW')),
+                      ButtonSegment(
+                          value: Effectiveness.medium, label: Text('MEDIUM')),
+                      ButtonSegment(
+                          value: Effectiveness.high, label: Text('HIGH')),
+                    ],
+                    selected: _effectiveness != null ? {_effectiveness!} : {},
+                    onSelectionChanged: (Set<Effectiveness> newSelection) {
+                      setState(() {
+                        _effectiveness = newSelection.first;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 32),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: widget.onSkip,
+                        child: const Text('Skip'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _canSubmit
+                            ? () => widget.onSubmit(
+                                  _intensity!,
+                                  _comfort!,
+                                  _effectiveness!,
+                                )
+                            : null,
+                        child: const Text('Submit'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

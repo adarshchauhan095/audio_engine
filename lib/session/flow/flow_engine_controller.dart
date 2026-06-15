@@ -10,6 +10,11 @@ import 'flow_state.dart';
 import 'flow_step.dart';
 import 'flow_timer.dart';
 import 'flow_transitions.dart';
+import '../../storage/anaps_storage.dart';
+
+enum IntensityPerception { tooLow, ok, tooHigh }
+enum ComfortLevel { uncomfortable, neutral, comfortable }
+enum Effectiveness { low, medium, high }
 
 /// Sequences Phase-3 modules with strict timing and click-free transitions.
 class FlowEngineController {
@@ -25,6 +30,8 @@ class FlowEngineController {
   FlowDefinition? _flow;
   double _tinnitusFrequencyHz = 4000.0;
   double _baseAmp = 0.15;
+  double _anapsMaxIntensity = 0.20;
+  double _anapsFreqOffset = 0.0;
   bool _stopRequested = false;
   bool _advancing = false;
 
@@ -62,6 +69,8 @@ class FlowEngineController {
     _flow = flow;
     _tinnitusFrequencyHz = tinnitusFrequencyHz;
     _baseAmp = baseAmp;
+    _anapsMaxIntensity = await AnapsStorage.loadMaxIntensity();
+    _anapsFreqOffset = await AnapsStorage.loadFrequencyOffset();
     _stopRequested = false;
     _advancing = false;
     errorMessage.value = null;
@@ -87,7 +96,7 @@ class FlowEngineController {
 
   Future<bool> _launchStep(FlowStep step, {required bool isFirstStep}) async {
     final Phase3ModuleParams params = step.resolvedParams();
-    final double baseFreq = params.engineBaseFreq(_tinnitusFrequencyHz);
+    final double baseFreq = params.engineBaseFreq(_tinnitusFrequencyHz + _anapsFreqOffset);
     final bool rmp = step.module == Phase3ModuleType.rmp;
     final bool pip = step.module == Phase3ModuleType.pip;
     final bool binaural = step.module == Phase3ModuleType.binaural;
@@ -101,7 +110,7 @@ class FlowEngineController {
         binaural: binaural,
         baseFreq: baseFreq,
         baseAmp: _baseAmp,
-        maxIntensity: step.maxIntensity01(),
+        maxIntensity: _anapsMaxIntensity,
         durationMinutes: step.durationMinutes,
         targetRmpDepth: params.engineRmpDepth(),
         targetRmpRate: params.rmpChangeRateHz,
@@ -128,7 +137,7 @@ class FlowEngineController {
       binaural: binaural,
       baseFreq: baseFreq,
       baseAmp: _baseAmp,
-      maxIntensity: step.maxIntensity01(),
+      maxIntensity: _anapsMaxIntensity,
       durationMinutes: step.durationMinutes,
       targetRmpDepth: params.engineRmpDepth(),
       targetRmpRate: params.rmpChangeRateHz,
@@ -155,8 +164,7 @@ class FlowEngineController {
       state.value = FlowEngineState.transitioning;
       _timer.stop();
       await _session.completeFlowAndStop();
-      _flow = null;
-      state.value = FlowEngineState.finished;
+      state.value = FlowEngineState.feedback;
       currentStepIndex.value = 0;
       _advancing = false;
       return;
@@ -181,7 +189,7 @@ class FlowEngineController {
     currentStepIndex.value = idx + 1;
 
     final Phase3ModuleParams params = next.resolvedParams();
-    final double baseFreq = params.engineBaseFreq(_tinnitusFrequencyHz);
+    final double baseFreq = params.engineBaseFreq(_tinnitusFrequencyHz + _anapsFreqOffset);
 
     _session.beginOrchestratedStep(
       subthreshold: false,
@@ -191,7 +199,7 @@ class FlowEngineController {
       binaural: next.module == Phase3ModuleType.binaural,
       baseFreq: baseFreq,
       baseAmp: _baseAmp,
-      maxIntensity: next.maxIntensity01(),
+      maxIntensity: _anapsMaxIntensity,
       durationMinutes: next.durationMinutes,
       targetRmpDepth: params.engineRmpDepth(),
       targetRmpRate: params.rmpChangeRateHz,
@@ -219,14 +227,23 @@ class FlowEngineController {
     if (_session.isRunning.value) {
       _session.stopSession();
     }
-    _flow = null;
-    state.value = FlowEngineState.idle;
+    state.value = FlowEngineState.feedback;
     currentStepIndex.value = 0;
   }
 
   Future<void> _failFlow(String message) async {
     errorMessage.value = message;
-    await stopFlow();
+    if (state.value == FlowEngineState.idle) return;
+    _stopRequested = true;
+    state.value = FlowEngineState.stopping;
+    _session.clearFlowOrchestration();
+    _timer.stop();
+    if (_session.isRunning.value) {
+      _session.stopSession();
+    }
+    _flow = null;
+    state.value = FlowEngineState.idle;
+    currentStepIndex.value = 0;
   }
 
   void resetToIdle() {
@@ -238,5 +255,54 @@ class FlowEngineController {
     state.value = FlowEngineState.idle;
     _session.clearFlowOrchestration();
     _session.resetCompletion();
+  }
+
+  void skipFeedback() {
+    resetToIdle();
+  }
+
+  Future<void> submitFeedback(
+    IntensityPerception perception,
+    ComfortLevel comfort,
+    Effectiveness effectiveness,
+  ) async {
+    state.value = FlowEngineState.adapt;
+
+    // Intensity Adjustment Rules
+    double nextIntensity = _anapsMaxIntensity;
+    
+    // Rule Set 1 - Intensity Perception
+    if (perception == IntensityPerception.tooLow) {
+      nextIntensity += 0.05;
+    } else if (perception == IntensityPerception.tooHigh) {
+      nextIntensity -= 0.05;
+    }
+    nextIntensity = nextIntensity.clamp(0.20, 0.50);
+
+    // Rule Set 2 - Comfort Level
+    if (comfort == ComfortLevel.uncomfortable) {
+      nextIntensity -= 0.05;
+    } else if (comfort == ComfortLevel.comfortable) {
+      nextIntensity += 0.05;
+    }
+    nextIntensity = nextIntensity.clamp(0.20, 0.50);
+
+    // Frequency Offset Adjustment Rules
+    double nextFreqOffset = _anapsFreqOffset;
+
+    // Rule Set - Effectiveness
+    if (effectiveness == Effectiveness.low) {
+      nextFreqOffset += 10.0;
+    } else if (effectiveness == Effectiveness.high) {
+      nextFreqOffset -= 10.0;
+    }
+    nextFreqOffset = nextFreqOffset.clamp(-50.0, 50.0);
+
+    _anapsMaxIntensity = nextIntensity;
+    _anapsFreqOffset = nextFreqOffset;
+
+    await AnapsStorage.saveParams(_anapsMaxIntensity, _anapsFreqOffset);
+
+    resetToIdle();
   }
 }
