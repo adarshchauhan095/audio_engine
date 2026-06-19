@@ -68,6 +68,13 @@ Phase 6 introduces the official terminology and data foundations used by TinnitX
     - *Phase-Interruption Patterning (PIP)*
     - *Spectral Sideband Stimulation (SSS)*
     - *Binaural Desynchronization*
+- **Phase 5.2 Generator Expansion Layer (native):**
+    - Managed centrally by an `OperatorRegistry` pattern.
+    - *Phase Breaker Generator*
+    - *Anti-Correlation Generator*
+    - *Contrast Remap Generator*
+    - *Salience Scrambler Generator*
+    - *Null Model Generator*
 
 ### Persistence & Storage
 - **Local Storage:** `shared_preferences`
@@ -174,7 +181,8 @@ TherapyRouter (C++ Core taking `TherapyConfig` structs from the bridge)
    ├──> RMPModule
    ├──> PIPModule
    ├──> SidebandModule
-   └──> BinauralModule
+   ├──> BinauralModule
+   └──> OperatorRegistry (Phase 5.2 Generators: PhaseBreaker, AntiCorrelation, ContrastRemap, SalienceScrambler, NullModel)
    │
    ▼
 VoiceManager / ParameterSmoother (Mixing and smoothing transitions)

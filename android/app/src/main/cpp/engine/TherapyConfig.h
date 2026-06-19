@@ -1,11 +1,26 @@
 #pragma once
 
+#include "modules/GeneratorParams.h"
+
 struct TherapyConfig {
   bool enableSubthreshold = false;
   bool enableRMP = false;
   bool enablePIP = false;
   bool enableSidebands = false;
   bool enableBinaural = false;
+
+  // Phase 5.2 Generators (internal only, programmatically controlled later)
+  bool enablePhaseBreaker = false;
+  bool enableAntiCorrelation = false;
+  bool enableContrastRemap = false;
+  bool enableSalienceScrambler = false;
+  bool enableNullModel = false;
+
+  phase5::PhaseBreakerParams phaseBreakerParams;
+  phase5::AntiCorrelationParams antiCorrelationParams;
+  phase5::ContrastRemapParams contrastRemapParams;
+  phase5::SalienceScramblerParams salienceScramblerParams;
+  phase5::NullModelParams nullModelParams;
 
   // Preset base frequency/amplitude. These override the global engine
   // oscillator values while therapy routing is active.

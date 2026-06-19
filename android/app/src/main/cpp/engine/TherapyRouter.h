@@ -8,6 +8,7 @@
 #include "modules/PIPModule.h"
 #include "modules/SidebandModule.h"
 #include "modules/BinauralModule.h"
+#include "modules/OperatorRegistry.h"
 #include "ParameterSmoother.h"
 
 class TherapyRouter {
@@ -42,6 +43,8 @@ private:
     PIPModule pip_;
     SidebandModule sidebands_;
     BinauralModule binaural_;
+
+    phase5::OperatorRegistry phase5Registry_;
 
     // Clickless PIP param-change handling:
     // when interval/duration changes, fade PIP module to silence, reset its

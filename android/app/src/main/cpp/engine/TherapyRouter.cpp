@@ -8,6 +8,7 @@ void TherapyRouter::init(double sampleRate) {
   pip_.init(sampleRate);
   sidebands_.init(sampleRate);
   binaural_.init(sampleRate);
+  phase5Registry_.init(sampleRate);
 
   subthresholdGainSmoother_.setSmoothingTimeMs(20.0f, sampleRate_);
   rmpGainSmoother_.setSmoothingTimeMs(20.0f, sampleRate_);
@@ -30,6 +31,7 @@ void TherapyRouter::resetAllModulePhases() {
   pip_.reset();
   sidebands_.resetPhases();
   binaural_.resetPhases();
+  phase5Registry_.reset();
 }
 
 void TherapyRouter::resetModuleGains() {
@@ -175,6 +177,12 @@ StereoSample TherapyRouter::process() {
     out.left += b.left * binM;
     out.right += b.right * binM;
   }
+
+  // Phase 5.2 Expansion Layer
+  // Generators are internally clamped and safe.
+  float phase5Mix = phase5Registry_.process(config_);
+  out.left += phase5Mix;
+  out.right += phase5Mix;
 
   return out;
 }

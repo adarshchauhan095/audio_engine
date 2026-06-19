@@ -23,6 +23,9 @@ add_library(native_audio SHARED
   engine/modules/PIPModule.cpp
   engine/modules/SidebandModule.cpp
   engine/modules/BinauralModule.cpp
+  engine/modules/OperatorRegistry.cpp
+  engine/tests/TestUtils.cpp
+  engine/tests/GeneratorTests.cpp
 )
 
 # Specifies private include directories for the 'native_audio' library.
