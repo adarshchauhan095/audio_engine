@@ -111,6 +111,12 @@ void audio_reset_output_stream(NativeAudioHandle handle);
 
 void audio_set_output_device_id(NativeAudioHandle handle, int deviceId);
 
+// Phase 5.2 testing hooks
+int audio_phase52_run_test(NativeAudioHandle handle, int testId);
+
+void audio_phase52_set_generator_params(NativeAudioHandle h, int generatorId, float p1, float p2, float p3, float p4, float p5);
+void audio_phase52_get_diagnostics(NativeAudioHandle h, float* outRms, float* outPeak, int* outNanCount, int* outClipCount);
+
 /// Closes the extern "C" block.
 #ifdef __cplusplus
 }

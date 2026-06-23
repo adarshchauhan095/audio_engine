@@ -252,6 +252,79 @@ int AudioEngine::phase2Stop() {
   return 1;
 }
 
+void AudioEngine::setPhase52GeneratorParams(int generatorId, float p1, float p2, float p3, float p4, float p5) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  // generatorId mapping: 
+  // 1 = PhaseBreaker
+  // 2 = AntiCorrelation
+  // 3 = ContrastRemap
+  // 4 = SalienceScrambler
+  // 5 = NullModel
+  // 0 = Disable All
+  
+  if (generatorId == 0) {
+      phase52QaConfig_.enablePhaseBreaker = false;
+      phase52QaConfig_.enableAntiCorrelation = false;
+      phase52QaConfig_.enableContrastRemap = false;
+      phase52QaConfig_.enableSalienceScrambler = false;
+      phase52QaConfig_.enableNullModel = false;
+      therapyRouter_.updateConfig(TherapyConfig::inactive());
+      return;
+  }
+  
+  if (generatorId == 1) {
+      phase52QaConfig_.enablePhaseBreaker = true;
+      phase52QaConfig_.phaseBreakerParams.baseFrequency = p1;
+      phase52QaConfig_.phaseBreakerParams.driftAmount = p2;
+      phase52QaConfig_.phaseBreakerParams.driftSpeed = p3;
+      phase52QaConfig_.phaseBreakerParams.phaseJitter = p4;
+      phase52QaConfig_.phaseBreakerParams.amplitude = p5;
+  } else if (generatorId == 2) {
+      phase52QaConfig_.enableAntiCorrelation = true;
+      phase52QaConfig_.antiCorrelationParams.baseFrequency = p1;
+      phase52QaConfig_.antiCorrelationParams.inversionDepth = p2;
+      phase52QaConfig_.antiCorrelationParams.delayMs = p3;
+      phase52QaConfig_.antiCorrelationParams.amplitude = p4;
+  } else if (generatorId == 3) {
+      phase52QaConfig_.enableContrastRemap = true;
+      phase52QaConfig_.contrastRemapParams.baseFrequency = p1;
+      phase52QaConfig_.contrastRemapParams.contrastWidth = p2;
+      phase52QaConfig_.contrastRemapParams.contrastShift = p3;
+      phase52QaConfig_.contrastRemapParams.modulationSpeed = p4;
+      phase52QaConfig_.contrastRemapParams.amplitude = p5;
+  } else if (generatorId == 4) {
+      phase52QaConfig_.enableSalienceScrambler = true;
+      phase52QaConfig_.salienceScramblerParams.burstRate = p1;
+      phase52QaConfig_.salienceScramblerParams.burstLengthMs = p2;
+      phase52QaConfig_.salienceScramblerParams.jitterAmount = p3;
+      phase52QaConfig_.salienceScramblerParams.amplitude = p4;
+  } else if (generatorId == 5) {
+      phase52QaConfig_.enableNullModel = true;
+      phase52QaConfig_.nullModelParams.amplitude = p1;
+      phase52QaConfig_.nullModelParams.noiseFloor = p2;
+      phase52QaConfig_.nullModelParams.stability = p3;
+  }
+
+  // Force active state to bypass standard modules but allow Phase 5.2
+  // We use therapyUpdate to push these changes safely into the router.
+  therapyRouter_.updateConfig(phase52QaConfig_);
+}
+
+void AudioEngine::getDiagnostics(float* outRms, float* outPeak, int* outNanCount, int* outClipCount) {
+  int samples = diagSampleCount_.exchange(0, std::memory_order_relaxed);
+  float rmsSum = diagRmsSum_.exchange(0.0f, std::memory_order_relaxed);
+  
+  if (samples > 0) {
+      *outRms = std::sqrt(rmsSum / static_cast<float>(samples));
+  } else {
+      *outRms = 0.0f;
+  }
+  
+  *outPeak = diagPeak_.exchange(0.0f, std::memory_order_relaxed);
+  *outNanCount = diagNanCount_.load(std::memory_order_relaxed);
+  *outClipCount = diagClipCount_.load(std::memory_order_relaxed);
+}
+
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream,
                                                    void *audioData,
                                                    int32_t numFrames) {
@@ -313,6 +386,30 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
         therapyRouter_.updateConfig(TherapyConfig::inactive());
         therapySessionActive_.store(false, std::memory_order_release);
       }
+    }
+
+    // Diagnostics Gathering (Phase 5.2 QA testing)
+    float monoSum = 0.5f * (left + right);
+    if (std::isnan(monoSum) || std::isinf(monoSum)) {
+        diagNanCount_.fetch_add(1, std::memory_order_relaxed);
+        left = 0.0f; right = 0.0f; // Silence invalid values
+    } else {
+        float absLeft = std::fabs(left);
+        float absRight = std::fabs(right);
+        float localPeak = std::max(absLeft, absRight);
+        
+        if (localPeak > 1.0f) {
+            diagClipCount_.fetch_add(1, std::memory_order_relaxed);
+        }
+        
+        float currentPeak = diagPeak_.load(std::memory_order_relaxed);
+        while (localPeak > currentPeak && !diagPeak_.compare_exchange_weak(currentPeak, localPeak, std::memory_order_relaxed)) {}
+        
+        float rmsValue = (left * left + right * right) * 0.5f;
+        float currentSum = diagRmsSum_.load(std::memory_order_relaxed);
+        while (!diagRmsSum_.compare_exchange_weak(currentSum, currentSum + rmsValue, std::memory_order_relaxed)) {}
+        
+        diagSampleCount_.fetch_add(1, std::memory_order_relaxed);
     }
 
     const size_t base = static_cast<size_t>(i) * static_cast<size_t>(channelCount);

@@ -21,8 +21,9 @@ public:
     // Validates that no NaN or Inf is present, and signal is bounded
     static bool validateBuffer(const std::vector<float>& buffer, float minVal = -1.0f, float maxVal = 1.0f);
 
+    typedef void (*LogCallback)(const char*);
     // Prints success or failure message
-    static void printResult(const std::string& testName, bool success);
+    static void printResult(const std::string& testName, bool success, LogCallback cb = nullptr);
 };
 
 } // namespace tests

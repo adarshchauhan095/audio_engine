@@ -57,6 +57,10 @@ public:
   int phase2Update(const Phase2Config &config);
   int phase2Stop();
 
+  // Phase 5.2 QA Testing API
+  void setPhase52GeneratorParams(int generatorId, float p1, float p2, float p3, float p4, float p5);
+  void getDiagnostics(float* outRms, float* outPeak, int* outNanCount, int* outClipCount);
+
   typedef void (*LogCallback)(const char *);
   void setLogCallback(LogCallback cb) { logCb_ = cb; }
 
@@ -93,6 +97,16 @@ private:
   std::atomic<bool> therapyStopPending_{false};
   LogCallback logCb_ = nullptr;
   OutputLostCallback outputLostCb_ = nullptr;
+
+  // Phase 5.2 QA Diagnostics
+  std::atomic<float> diagPeak_{0.0f};
+  std::atomic<float> diagRmsSum_{0.0f};
+  std::atomic<int> diagSampleCount_{0};
+  std::atomic<int> diagNanCount_{0};
+  std::atomic<int> diagClipCount_{0};
+  
+  // Stored config for QA independent generator manipulation
+  TherapyConfig phase52QaConfig_;
 
   void finalizeTherapyStopLocked();
   void log(const char *msg) {

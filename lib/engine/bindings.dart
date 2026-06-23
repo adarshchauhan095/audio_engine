@@ -80,6 +80,15 @@ typedef _RegisterOutputLostDart = void Function(
 typedef _SetIntC = Void Function(NativeAudioHandle, Int32);
 typedef _SetIntDart = void Function(NativeAudioHandle, int);
 
+typedef _RunTestC = Int32 Function(NativeAudioHandle, Int32);
+typedef _RunTestDart = int Function(NativeAudioHandle, int);
+
+typedef _Phase52SetGeneratorParamsC = Void Function(NativeAudioHandle, Int32, Float, Float, Float, Float, Float);
+typedef _Phase52SetGeneratorParamsDart = void Function(NativeAudioHandle, int, double, double, double, double, double);
+
+typedef _Phase52GetDiagnosticsC = Void Function(NativeAudioHandle, Pointer<Float>, Pointer<Float>, Pointer<Int32>, Pointer<Int32>);
+typedef _Phase52GetDiagnosticsDart = void Function(NativeAudioHandle, Pointer<Float>, Pointer<Float>, Pointer<Int32>, Pointer<Int32>);
+
 class NativeBindings {
   late final _CreateDart _create;
   late final _StartDart _start;
@@ -103,6 +112,9 @@ class NativeBindings {
   late final _VoidNativeAudioHandleFuncDart _resetOutputStream;
   late final _SetIntDart _setOutputDeviceId;
   late final _SetIntDart _setStereoEnabled;
+  late final _RunTestDart _runTestPhase52;
+  late final _Phase52SetGeneratorParamsDart _phase52SetGeneratorParams;
+  late final _Phase52GetDiagnosticsDart _phase52GetDiagnostics;
 
   NativeBindings(DynamicLibrary lib) {
     _create = lib.lookupFunction<_CreateC, _CreateDart>('audio_create');
@@ -175,6 +187,9 @@ class NativeBindings {
       'audio_set_output_device_id',
     );
     _setStereoEnabled = lib.lookupFunction<_SetIntC, _SetIntDart>('audio_set_stereo_enabled');
+    _runTestPhase52 = lib.lookupFunction<_RunTestC, _RunTestDart>('audio_phase52_run_test');
+    _phase52SetGeneratorParams = lib.lookupFunction<_Phase52SetGeneratorParamsC, _Phase52SetGeneratorParamsDart>('audio_phase52_set_generator_params');
+    _phase52GetDiagnostics = lib.lookupFunction<_Phase52GetDiagnosticsC, _Phase52GetDiagnosticsDart>('audio_phase52_get_diagnostics');
   }
 
   NativeAudioHandle create() => _create();
@@ -291,4 +306,13 @@ class NativeBindings {
 
   void setOutputDeviceId(NativeAudioHandle handle, int deviceId) =>
       _setOutputDeviceId(handle, deviceId);
+
+  int runTestPhase52(NativeAudioHandle handle, int testId) =>
+      _runTestPhase52(handle, testId);
+      
+  void setPhase52GeneratorParams(NativeAudioHandle handle, int generatorId, double p1, double p2, double p3, double p4, double p5) =>
+      _phase52SetGeneratorParams(handle, generatorId, p1, p2, p3, p4, p5);
+      
+  void getDiagnostics(NativeAudioHandle handle, Pointer<Float> outRms, Pointer<Float> outPeak, Pointer<Int32> outNanCount, Pointer<Int32> outClipCount) =>
+      _phase52GetDiagnostics(handle, outRms, outPeak, outNanCount, outClipCount);
 }

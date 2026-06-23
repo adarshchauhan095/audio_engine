@@ -17,9 +17,13 @@ import 'profile_session_catalog.dart';
 import 'session_controller.dart';
 import 'therapy_session_controller.dart';
 
+// Broadcast stream for UI subscribers
+final StreamController<String> _nativeLogStreamController = StreamController<String>.broadcast();
+
 void _logNativeMessage(Pointer<Utf8> msg) {
   final str = msg.toDartString();
   debugPrint('NativeEngine: $str');
+  _nativeLogStreamController.add(str);
 }
 
 class SessionRunSnapshot {
@@ -103,6 +107,7 @@ class AudioRuntimeController {
   TherapySessionController? get therapySession => _therapySessionController;
   bool get hasEngine => _engine != null;
   bool get hasActiveSession => activeSession.value != null;
+  Stream<String> get nativeLogStream => _nativeLogStreamController.stream;
 
   Timer? _sessionTicker;
   bool _sessionCancelRequested = false;
@@ -659,6 +664,11 @@ class AudioRuntimeController {
   Future<void> runLongRunStabilityTest({int? durationSeconds}) async {
     if (_sessionController == null) return;
     await _sessionController!.runLongRunStabilityTest(durationSeconds: durationSeconds);
+  }
+
+  int runPhase52Test(int testId) {
+    if (_engine == null) return -1;
+    return _engine!.runTestPhase52(testId);
   }
 
   void dispose() {

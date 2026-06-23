@@ -2,6 +2,8 @@ import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:ffi/ffi.dart';
+
 import 'audio_control.dart';
 import 'bindings.dart';
 import 'ffi_types.dart';
@@ -251,11 +253,49 @@ class AudioEngine implements AudioControl {
     _bindings.registerOutputLostCallback(_handle!, Pointer.fromAddress(0));
   }
 
-  /// Next [start] opens on this Android [AudioDeviceInfo] id; cleared after a
-  /// successful start. Use `-1` for system default routing.
+  /// Sets the preferred output device ID. -1 means default.
   void setPreferredOutputDeviceId(int deviceId) {
     if (_handle == null) return;
     _bindings.setOutputDeviceId(_handle!, deviceId);
+  }
+
+  /// Runs Phase 5.2 backend tests directly via FFI. 
+  /// Results are sent back via the log stream.
+  int runTestPhase52(int testId) {
+    if (_handle == null) return -1;
+    return _bindings.runTestPhase52(_handle!, testId);
+  }
+
+  void setPhase52GeneratorParams(int generatorId, double p1, double p2, double p3, double p4, double p5) {
+    if (_handle == null) return;
+    _bindings.setPhase52GeneratorParams(_handle!, generatorId, p1, p2, p3, p4, p5);
+  }
+
+  Map<String, dynamic> getPhase52Diagnostics() {
+    if (_handle == null) {
+      return {'rms': 0.0, 'peak': 0.0, 'nanCount': 0, 'clipCount': 0};
+    }
+    
+    final Pointer<Float> pRms = calloc<Float>();
+    final Pointer<Float> pPeak = calloc<Float>();
+    final Pointer<Int32> pNan = calloc<Int32>();
+    final Pointer<Int32> pClip = calloc<Int32>();
+    
+    _bindings.getDiagnostics(_handle!, pRms, pPeak, pNan, pClip);
+    
+    final map = {
+      'rms': pRms.value,
+      'peak': pPeak.value,
+      'nanCount': pNan.value,
+      'clipCount': pClip.value,
+    };
+    
+    calloc.free(pRms);
+    calloc.free(pPeak);
+    calloc.free(pNan);
+    calloc.free(pClip);
+    
+    return map;
   }
 
   /// Closes the Oboe stream so the next [start] reopens on the current device.

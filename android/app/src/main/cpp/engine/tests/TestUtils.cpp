@@ -17,11 +17,16 @@ bool TestUtils::validateBuffer(const std::vector<float>& buffer, float minVal, f
     return true;
 }
 
-void TestUtils::printResult(const std::string& testName, bool success) {
+void TestUtils::printResult(const std::string& testName, bool success, LogCallback cb) {
+    std::string msg;
     if (success) {
-        std::cout << "[SUCCESS] " << testName << " passed.\n";
+        msg = "[SUCCESS] " + testName + " passed.";
     } else {
-        std::cerr << "[FAILED]  " << testName << " failed.\n";
+        msg = "[FAILED]  " + testName + " failed.";
+    }
+    std::cout << msg << "\n";
+    if (cb) {
+        cb(msg.c_str());
     }
 }
 

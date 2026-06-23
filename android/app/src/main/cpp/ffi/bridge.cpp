@@ -2,6 +2,7 @@
 #include "../engine/AudioEngine.h" // Includes the C++ AudioEngine class definition.
 #include "../engine/TherapyConfig.h"
 #include "../engine/advance_engine/AdvanceEngineConfig.h"
+#include "../engine/tests/GeneratorTests.h"
 
 /// @brief Implements `audio_create()` from `bridge.h`.
 /// Creates a new instance of the `AudioEngine` class on the heap and returns
@@ -191,7 +192,10 @@ void audio_set_stereo_enabled(NativeAudioHandle h, int enabled) {
   static_cast<AudioEngine *>(h)->setStereoEnabled(enabled != 0);
 }
 
+static AudioLogCallback g_logCb = nullptr;
+
 void audio_register_log_callback(NativeAudioHandle h, AudioLogCallback cb) {
+  g_logCb = cb;
   static_cast<AudioEngine *>(h)->setLogCallback(cb);
 }
 
@@ -207,4 +211,40 @@ void audio_reset_output_stream(NativeAudioHandle h) {
 void audio_set_output_device_id(NativeAudioHandle h, int deviceId) {
   static_cast<AudioEngine *>(h)->setPreferredOutputDeviceId(
       static_cast<int32_t>(deviceId));
+}
+
+int audio_phase52_run_test(NativeAudioHandle handle, int testId) {
+  if (!handle) return -1;
+  // testId mapping:
+  // 1 = Run all standard Generator tests (PhaseBreaker, etc.)
+  // We can just invoke GeneratorTests::runAll() directly since it outputs
+  // via TestUtils::printResult, but we need those results routed to logCallback.
+  // Actually, TestUtils currently uses std::cout/cerr. We should update TestUtils 
+  // to use Logging::info / Logging::error instead so it routes via the FFI log callback!
+  
+  if (testId == 1) {
+    phase5::tests::GeneratorTests::runAll([](const char* msg) {
+        if (g_logCb) g_logCb(msg);
+    });
+    return 0;
+  }
+  return 1;
+}
+
+void audio_phase52_set_generator_params(NativeAudioHandle handle, int generatorId, float p1, float p2, float p3, float p4, float p5) {
+  if (handle == nullptr) return;
+  auto* engine = reinterpret_cast<AudioEngine*>(handle);
+  engine->setPhase52GeneratorParams(generatorId, p1, p2, p3, p4, p5);
+}
+
+void audio_phase52_get_diagnostics(NativeAudioHandle handle, float* outRms, float* outPeak, int* outNanCount, int* outClipCount) {
+  if (handle == nullptr) {
+      if (outRms) *outRms = 0;
+      if (outPeak) *outPeak = 0;
+      if (outNanCount) *outNanCount = 0;
+      if (outClipCount) *outClipCount = 0;
+      return;
+  }
+  auto* engine = reinterpret_cast<AudioEngine*>(handle);
+  engine->getDiagnostics(outRms, outPeak, outNanCount, outClipCount);
 }

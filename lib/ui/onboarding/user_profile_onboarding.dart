@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/user_profile.dart';
 import '../../storage/user_profile_storage.dart';
 import '../screens/therapy_entry_screen.dart';
+import '../../session/audio_runtime_controller.dart';
+import '../qa/phase52_qa_screen.dart';
 
 class UserProfileOnboarding extends StatefulWidget {
   const UserProfileOnboarding({super.key});
@@ -171,7 +173,15 @@ class _UserProfileOnboardingState extends State<UserProfileOnboarding> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tinnitus Profile'),
+        title: GestureDetector(
+          onLongPress: () {
+            final runtime = AudioRuntimeController();
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => Phase52QaScreen(runtimeController: runtime)),
+            ).then((_) => runtime.dispose());
+          },
+          child: const Text('Tinnitus Profile'),
+        ),
         leading: _currentIndex > 0
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),

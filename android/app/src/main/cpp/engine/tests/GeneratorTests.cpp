@@ -13,7 +13,10 @@ constexpr double kSampleRate = 48000.0;
 // Generate 3 seconds of audio
 constexpr int kNumSamples = static_cast<int>(kSampleRate * 3.0);
 
-void GeneratorTests::runAll() {
+static GeneratorTests::LogCallback g_cb = nullptr;
+
+void GeneratorTests::runAll(LogCallback cb) {
+    g_cb = cb;
     testPhaseBreaker();
     testAntiCorrelation();
     testContrastRemap();
@@ -37,7 +40,7 @@ void GeneratorTests::testPhaseBreaker() {
     });
 
     bool ok = TestUtils::validateBuffer(buffer, -1.0f, 1.0f);
-    TestUtils::printResult("PhaseBreakerTest", ok);
+    TestUtils::printResult("PhaseBreakerTest", ok, g_cb);
 }
 
 void GeneratorTests::testAntiCorrelation() {
@@ -55,7 +58,7 @@ void GeneratorTests::testAntiCorrelation() {
     });
 
     bool ok = TestUtils::validateBuffer(buffer, -1.0f, 1.0f);
-    TestUtils::printResult("AntiCorrelationTest", ok);
+    TestUtils::printResult("AntiCorrelationTest", ok, g_cb);
 }
 
 void GeneratorTests::testContrastRemap() {
@@ -74,7 +77,7 @@ void GeneratorTests::testContrastRemap() {
     });
 
     bool ok = TestUtils::validateBuffer(buffer, -1.0f, 1.0f);
-    TestUtils::printResult("ContrastRemapTest", ok);
+    TestUtils::printResult("ContrastRemapTest", ok, g_cb);
 }
 
 void GeneratorTests::testSalienceScrambler() {
@@ -92,7 +95,7 @@ void GeneratorTests::testSalienceScrambler() {
     });
 
     bool ok = TestUtils::validateBuffer(buffer, -1.0f, 1.0f);
-    TestUtils::printResult("SalienceScramblerTest", ok);
+    TestUtils::printResult("SalienceScramblerTest", ok, g_cb);
 }
 
 void GeneratorTests::testNullModel() {
@@ -109,7 +112,7 @@ void GeneratorTests::testNullModel() {
     });
 
     bool ok = TestUtils::validateBuffer(buffer, -1.0f, 1.0f);
-    TestUtils::printResult("NullModelTest", ok);
+    TestUtils::printResult("NullModelTest", ok, g_cb);
 }
 
 } // namespace tests

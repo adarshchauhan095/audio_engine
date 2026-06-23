@@ -5,7 +5,8 @@ namespace tests {
 
 class GeneratorTests {
 public:
-    static void runAll();
+    typedef void (*LogCallback)(const char*);
+    static void runAll(LogCallback cb = nullptr);
 
 private:
     static void testPhaseBreaker();
