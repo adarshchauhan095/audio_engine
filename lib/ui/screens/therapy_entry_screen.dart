@@ -6,8 +6,9 @@ import 'flow_selector_screen.dart';
 import 'phase3_modules_screen.dart';
 import 'user_profile_data_screen.dart';
 import '../../config/feature_flags.dart';
-import '../qa/phase52_qa_screen.dart';
+
 import '../../session/audio_runtime_controller.dart';
+import 'phase5_modules_screen.dart';
 
 /// Minimal launcher so Phase 1 and Phase 2 stay on separate screens per spec.
 class TherapyEntryScreen extends StatelessWidget {
@@ -96,24 +97,22 @@ class TherapyEntryScreen extends StatelessWidget {
               },
             ),
           ),
-          if (kNewDspGeneratorsTools) ...[
-            const SizedBox(height: 8),
-            Card(
-              child: ListTile(
-                title: const Text('Phase 5.2 (Internal QA)'),
-                subtitle: const Text('Generators / Validation / Diagnostics'),
-                trailing: const Icon(Icons.bug_report, color: Colors.red),
-                onTap: () {
-                  // final runtime = AudioRuntimeController();
-                  // Navigator.of(context).push<void>(
-                  //   MaterialPageRoute<void>(
-                  //     builder: (_) => NewDspGeneratorsScreen(runtimeController: runtime),
-                  //   ),
-                  // ).then((_) => runtime.dispose());
-                },
-              ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              title: const Text('Phase 5 Modules'),
+              subtitle: const Text('Phase 5 — Advanced DSP Generators'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                final runtime = AudioRuntimeController();
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Phase5ModulesScreen(runtimeController: runtime),
+                  ),
+                ).then((_) => runtime.dispose());
+              },
             ),
-          ],
+          ),
         ],
       ),
     );

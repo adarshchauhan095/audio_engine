@@ -108,7 +108,8 @@ bool TherapyRouter::isActive() const {
          enableRMP_.load(std::memory_order_acquire) || rmpGainSmoother_.target() > 0.0f || rmpGainSmoother_.current() > 0.001f ||
          enablePIP_.load(std::memory_order_acquire) || pipGainSmoother_.target() > 0.0f || pipGainSmoother_.current() > 0.001f ||
          enableSidebands_.load(std::memory_order_acquire) || sidebandsGainSmoother_.target() > 0.0f || sidebandsGainSmoother_.current() > 0.001f ||
-         enableBinaural_.load(std::memory_order_acquire) || binauralGainSmoother_.target() > 0.0f || binauralGainSmoother_.current() > 0.001f;
+         enableBinaural_.load(std::memory_order_acquire) || binauralGainSmoother_.target() > 0.0f || binauralGainSmoother_.current() > 0.001f ||
+         config_.enablePhaseBreaker || config_.enableAntiCorrelation || config_.enableContrastRemap || config_.enableSalienceScrambler || config_.enableNullModel;
 }
 
 StereoSample TherapyRouter::process() {

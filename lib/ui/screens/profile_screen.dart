@@ -156,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Card(
-              child: Padding(
+              child: Container(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

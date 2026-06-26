@@ -671,6 +671,18 @@ class AudioRuntimeController {
     return _engine!.runTestPhase52(testId);
   }
 
+  void setPhase52GeneratorParams(int generatorId, double p1, double p2, double p3, double p4, double p5) {
+    if (_engine == null) return;
+    _engine!.setPhase52GeneratorParams(generatorId, p1, p2, p3, p4, p5);
+    
+    // Automatically manage transport state for QA
+    if (generatorId != 0 && !playing.value) {
+      _setEnginePlaying(true);
+    } else if (generatorId == 0 && playing.value) {
+      _setEnginePlaying(false);
+    }
+  }
+
   void dispose() {
     _disposed = true;
     _routeRecoveryTimer?.cancel();
